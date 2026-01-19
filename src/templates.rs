@@ -16,7 +16,11 @@ pub enum TemplateType {
 impl TemplateType {
     /// Returns all available template types.
     pub fn all() -> &'static [TemplateType] {
-        &[TemplateType::Component, TemplateType::Runbook, TemplateType::Adr]
+        &[
+            TemplateType::Component,
+            TemplateType::Runbook,
+            TemplateType::Adr,
+        ]
     }
 
     /// Returns the default filename for this template type.

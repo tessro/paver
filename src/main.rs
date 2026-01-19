@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use paver::cli::{Cli, Command, ConfigCommand};
 use paver::commands::config;
+use paver::commands::new::{self, NewArgs};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -13,8 +14,16 @@ fn main() -> Result<()> {
         Command::Check => {
             println!("paver check: not yet implemented");
         }
-        Command::New => {
-            println!("paver new: not yet implemented");
+        Command::New {
+            doc_type,
+            name,
+            output,
+        } => {
+            new::execute(NewArgs {
+                doc_type: doc_type.into(),
+                name,
+                output,
+            })?;
         }
         Command::Prompt => {
             println!("paver prompt: not yet implemented");
