@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 use crate::templates::TemplateType;
@@ -36,7 +36,7 @@ pub enum PromptOutputFormat {
 #[derive(Subcommand)]
 pub enum Command {
     /// Initialize a project with PAVED documentation
-    Init,
+    Init(InitArgs),
 
     /// Validate PAVED documentation
     Check,
@@ -128,4 +128,20 @@ impl From<DocType> for TemplateType {
             DocType::Adr => TemplateType::Adr,
         }
     }
+}
+
+/// Arguments for the init command.
+#[derive(Args)]
+pub struct InitArgs {
+    /// Where to create docs directory
+    #[arg(long, default_value = "docs")]
+    pub docs_root: String,
+
+    /// Also install git hooks for validation
+    #[arg(long)]
+    pub hooks: bool,
+
+    /// Overwrite existing files
+    #[arg(long)]
+    pub force: bool,
 }

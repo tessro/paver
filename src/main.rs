@@ -3,6 +3,7 @@ use clap::Parser;
 use paver::cli::{Cli, Command, ConfigCommand, DocType, PromptOutputFormat};
 use paver::commands::config;
 use paver::commands::index;
+use paver::commands::init;
 use paver::commands::new::{self, NewArgs};
 use paver::commands::prompt::{generate_prompt, OutputFormat, PromptOptions};
 use paver::templates::TemplateType;
@@ -11,8 +12,13 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Init => {
-            println!("paver init: not yet implemented");
+        Command::Init(args) => {
+            init::run(init::InitArgs {
+                docs_root: args.docs_root,
+                hooks: args.hooks,
+                force: args.force,
+                working_dir: None,
+            })?;
         }
         Command::Check => {
             println!("paver check: not yet implemented");
