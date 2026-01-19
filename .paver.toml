@@ -9,7 +9,7 @@ version = "0.1"
 root = "docs"
 
 # Directory containing document templates
-templates = "templates"
+templates = "docs/templates"
 
 [rules]
 # Maximum lines per document
