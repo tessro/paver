@@ -27,5 +27,5 @@
 <!-- Tradeoffs and constraints. -->
 
 ## Paths
-<!-- Code paths this doc covers (used by `paver changed`). -->
+<!-- Code paths this doc covers (used by `pave changed`). -->
 <!-- Use glob patterns: src/foo.rs, src/bar/*.rs, src/**/*.ts -->

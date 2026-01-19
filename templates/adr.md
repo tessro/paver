@@ -16,7 +16,7 @@
 <!-- What else did we consider and why not? -->
 
 ## Verification
-<!-- How to verify the decision was correctly implemented? Commands in bash blocks are executable via `paver verify`. -->
+<!-- How to verify the decision was correctly implemented? Commands in bash blocks are executable via `pave verify`. -->
 
 Check the implementation follows the decision:
 ```bash

@@ -1,12 +1,12 @@
-# Runbook: Release Paver
+# Runbook: Release Pave
 
 ## When to Use
-When releasing a new version of paver. This includes new features, bug fixes, or breaking changes that should be published as a tagged release.
+When releasing a new version of pave. This includes new features, bug fixes, or breaking changes that should be published as a tagged release.
 
 ## Preconditions
 - On main branch with clean working directory (`git status` shows no changes)
 - All tests passing (`cargo test` succeeds)
-- `paver check` passes on all documentation
+- `pave check` passes on all documentation
 - Version number determined following semantic versioning
 
 ## Steps
@@ -25,7 +25,7 @@ When releasing a new version of paver. This includes new features, bug fixes, or
 
 3. Validate all documentation:
    ```bash
-   paver check
+   pave check
    ```
 
 4. Update version in Cargo.toml:
@@ -92,7 +92,7 @@ git tag -l | tail -1
 Confirm the release binary version:
 
 ```bash
-./target/release/paver --version
+./target/release/pave --version
 ```
 
 ## Examples
@@ -116,4 +116,4 @@ git tag -a v1.0.0 -m "Release v1.0.0"
 ```
 
 ## Escalation
-For a small project like paver, escalation is typically not needed. If issues arise, review the git log and tag history to diagnose problems.
+For a small project like pave, escalation is typically not needed. If issues arise, review the git log and tag history to diagnose problems.

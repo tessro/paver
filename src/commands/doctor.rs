@@ -1,4 +1,4 @@
-//! Implementation of the `paver doctor` command for diagnosing documentation issues.
+//! Implementation of the `pave doctor` command for diagnosing documentation issues.
 //!
 //! The doctor command provides comprehensive diagnostics and recommendations for:
 //! - Configuration health
@@ -13,11 +13,11 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 use crate::cli::OutputFormat;
-use crate::config::{CONFIG_FILENAME, PaverConfig};
+use crate::config::{CONFIG_FILENAME, PaveConfig};
 use crate::parser::ParsedDoc;
 use crate::verification::extract_verification_spec;
 
-/// Arguments for the `paver doctor` command.
+/// Arguments for the `pave doctor` command.
 pub struct DoctorArgs {
     /// Specific files or directories to analyze.
     pub paths: Vec<PathBuf>,
@@ -99,7 +99,7 @@ impl DoctorResults {
     }
 }
 
-/// Execute the `paver doctor` command.
+/// Execute the `pave doctor` command.
 pub fn execute(args: DoctorArgs) -> Result<()> {
     // Find and load config
     let config_result = find_config();
@@ -111,7 +111,7 @@ pub fn execute(args: DoctorArgs) -> Result<()> {
 
     // If config exists and is valid, run further checks
     if let Ok(ref config_path) = config_result {
-        let config = PaverConfig::load(config_path)?;
+        let config = PaveConfig::load(config_path)?;
         let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
         // Determine paths to check
@@ -154,7 +154,7 @@ pub fn execute(args: DoctorArgs) -> Result<()> {
     }
 }
 
-/// Find the .paver.toml config file by walking up from the current directory.
+/// Find the .pave.toml config file by walking up from the current directory.
 fn find_config() -> Result<PathBuf> {
     let current_dir = env::current_dir().context("Failed to get current directory")?;
     let mut dir = current_dir.as_path();
@@ -191,7 +191,7 @@ fn run_config_checks(config_result: &Result<PathBuf>) -> DiagnosticCategory {
             });
 
             // Check if config is valid
-            match PaverConfig::load(config_path) {
+            match PaveConfig::load(config_path) {
                 Ok(config) => {
                     checks.push(DiagnosticCheck {
                         name: "Config file valid".to_string(),
@@ -291,7 +291,7 @@ fn run_config_checks(config_result: &Result<PathBuf>) -> DiagnosticCategory {
                 name: "Config file exists".to_string(),
                 status: CheckStatus::Error,
                 message: format!("No {} found", CONFIG_FILENAME),
-                suggestion: Some("Run 'paver init' to create a configuration file".to_string()),
+                suggestion: Some("Run 'pave init' to create a configuration file".to_string()),
                 affected_files: vec![],
             });
         }
@@ -353,7 +353,7 @@ fn should_skip_file(path: &Path) -> bool {
 /// Run documentation structure checks.
 fn run_docs_checks(
     paths: &[PathBuf],
-    config: &PaverConfig,
+    config: &PaveConfig,
     _config_dir: &Path,
 ) -> Result<DiagnosticCategory> {
     let mut checks = Vec::new();
@@ -600,7 +600,7 @@ fn run_verification_checks(paths: &[PathBuf], _config_dir: &Path) -> Result<Diag
 /// Run code coverage checks.
 fn run_coverage_checks(
     paths: &[PathBuf],
-    config: &PaverConfig,
+    config: &PaveConfig,
     config_dir: &Path,
 ) -> Result<DiagnosticCategory> {
     let mut checks = Vec::new();
@@ -765,7 +765,7 @@ fn output_text(results: &DoctorResults) {
     );
 
     if results.error_count > 0 || results.warning_count > 0 {
-        println!("Run 'paver check' for detailed validation");
+        println!("Run 'pave check' for detailed validation");
     }
 }
 
@@ -813,7 +813,7 @@ mod tests {
 
     fn create_test_config(temp_dir: &TempDir) -> PathBuf {
         let config_content = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -824,7 +824,7 @@ max_lines = 300
 require_verification = true
 require_examples = true
 "#;
-        let config_path = temp_dir.path().join(".paver.toml");
+        let config_path = temp_dir.path().join(".pave.toml");
         fs::write(&config_path, config_content).unwrap();
         config_path
     }
@@ -948,7 +948,7 @@ Missing required sections.
             category
                 .checks
                 .iter()
-                .any(|c| c.message.contains("No .paver.toml found"))
+                .any(|c| c.message.contains("No .pave.toml found"))
         );
     }
 
@@ -982,7 +982,7 @@ Missing required sections.
         let config_path = create_test_config(&temp_dir);
         let _doc_path = create_invalid_doc(&temp_dir, "invalid.md");
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let docs_dir = temp_dir.path().join("docs");
 
         let category = run_docs_checks(&[docs_dir], &config, temp_dir.path()).unwrap();
@@ -1007,7 +1007,7 @@ Missing required sections.
         let config_path = create_test_config(&temp_dir);
         let _doc_path = create_valid_doc(&temp_dir, "valid.md");
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let docs_dir = temp_dir.path().join("docs");
 
         let category = run_docs_checks(&[docs_dir], &config, temp_dir.path()).unwrap();
@@ -1115,7 +1115,7 @@ Example here.
 "#;
         fs::write(docs_dir.join("component.md"), content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let category = run_coverage_checks(&[docs_dir], &config, temp_dir.path()).unwrap();
 
         // Should find the path patterns
@@ -1150,7 +1150,7 @@ Example here.
 "#;
         fs::write(docs_dir.join("component.md"), content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let category = run_coverage_checks(&[docs_dir], &config, temp_dir.path()).unwrap();
 
         // Should warn about missing Paths sections

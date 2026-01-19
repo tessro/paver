@@ -5,7 +5,7 @@ title: Getting Started
 
 # Getting Started 🚀
 
-Get paver up and running in your project in under 5 minutes.
+Get pave up and running in your project in under 5 minutes.
 
 ## Installation 📦
 
@@ -20,17 +20,17 @@ cargo install --path .
 ## Initialize Your Project 🎬
 
 ```bash
-paver init
+pave init
 ```
 
-This creates a `.paver.toml` configuration file in your project root with sensible defaults.
+This creates a `.pave.toml` configuration file in your project root with sensible defaults.
 
 ## Your First Document 📝
 
 Create a component document:
 
 ```bash
-paver new component my-service
+pave new component my-service
 ```
 
 This scaffolds `docs/components/my-service.md` with all the PAVED sections ready to fill in:
@@ -48,7 +48,7 @@ This scaffolds `docs/components/my-service.md` with all the PAVED sections ready
 Keep your docs navigable:
 
 ```bash
-paver index
+pave index
 ```
 
 This scans your `docs/` directory and generates `docs/index.md` with:
@@ -62,7 +62,7 @@ This scans your `docs/` directory and generates `docs/index.md` with:
 Enforce quality rules:
 
 ```bash
-paver check
+pave check
 ```
 
 This validates your documentation against configured rules:
@@ -76,13 +76,13 @@ This validates your documentation against configured rules:
 View your config:
 
 ```bash
-paver config list
+pave config list
 ```
 
 Modify settings:
 
 ```bash
-paver config set rules.max_lines 500
+pave config set rules.max_lines 500
 ```
 
 ## Next Steps 🎯

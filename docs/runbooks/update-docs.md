@@ -1,10 +1,10 @@
-# Runbook: Update Paver Documentation
+# Runbook: Update Pave Documentation
 
 ## When to Use
-Use this runbook when updating paver's own documentation. This applies when:
+Use this runbook when updating pave's own documentation. This applies when:
 - Modifying source code in `src/` that changes behavior
 - Adding or changing CLI commands
-- Modifying configuration options in `.paver.toml`
+- Modifying configuration options in `.pave.toml`
 - Fixing bugs that affect documented behavior
 - Adding new features that need documentation
 
@@ -94,7 +94,7 @@ git checkout -- docs/path/to/file.md
 Confirm documentation is correct:
 
 ```bash
-./target/release/paver check
+./target/release/pave check
 ```
 
 ```bash
@@ -102,10 +102,10 @@ cargo test
 ```
 
 ## Escalation
-For a small project like paver, escalation is typically not needed. If issues arise:
+For a small project like pave, escalation is typically not needed. If issues arise:
 1. Review the [PAVED manifesto](../manifesto.md) for documentation guidelines
 2. Check existing documents in `docs/` for patterns
-3. Open an issue on the paver repository
+3. Open an issue on the pave repository
 
 ## Examples
 
@@ -147,5 +147,5 @@ After adding a new config option:
 
 1. Update `docs/components/configuration.md` with the new option
 2. Add the option to any relevant examples
-3. Update `.paver.toml` if it serves as a reference
+3. Update `.pave.toml` if it serves as a reference
 4. Validate with `cargo run -- check`

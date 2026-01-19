@@ -5,40 +5,40 @@ title: Documentation
 
 # Documentation 📚
 
-Welcome to the paver docs. You can read them, but they're not really for you - they're for the human+agent pair doing the work. 🤝
+Welcome to the pave docs. You can read them, but they're not really for you - they're for the human+agent pair doing the work. 🤝
 
 ## Overview
 
-paver is a CLI tool for creating, validating, and managing **PAVED** documentation - a framework optimized for AI agent workflows.
+pave is a CLI tool for creating, validating, and managing **PAVED** documentation - a framework optimized for AI agent workflows.
 
 | Command | Description |
 |---------|-------------|
-| `paver init` | Initialize paver in your project |
-| `paver new <type> <name>` | Scaffold a new document |
-| `paver prompt <type>` | Generate AI agent prompts |
-| `paver index` | Generate documentation index |
-| `paver check` | Validate documents against rules |
-| `paver config` | Manage configuration |
-| `paver adopt` | Scan existing docs to help onboard |
+| `pave init` | Initialize pave in your project |
+| `pave new <type> <name>` | Scaffold a new document |
+| `pave prompt <type>` | Generate AI agent prompts |
+| `pave index` | Generate documentation index |
+| `pave check` | Validate documents against rules |
+| `pave config` | Manage configuration |
+| `pave adopt` | Scan existing docs to help onboard |
 
 ## Guides 📖
 
 | Guide | Description |
 |-------|-------------|
-| [Getting Started](/docs/getting-started/) | Set up paver in a new project |
-| [Onboarding Existing Projects](/docs/onboarding-existing-projects/) | Adopt paver in an existing codebase |
-| [CI/CD Integration](/docs/ci-integration/) | Run paver in CI pipelines |
+| [Getting Started](/docs/getting-started/) | Set up pave in a new project |
+| [Onboarding Existing Projects](/docs/onboarding-existing-projects/) | Adopt pave in an existing codebase |
+| [CI/CD Integration](/docs/ci-integration/) | Run pave in CI pipelines |
 
 ## Document Types 📑
 
-paver supports three core document types:
+pave supports three core document types:
 
 ### Components 🔧
 
 For services, libraries, and modules. Includes Purpose, Interface, Configuration, Verification, Examples, Gotchas, and Decisions sections.
 
 ```bash
-paver new component auth-service
+pave new component auth-service
 ```
 
 ### Runbooks 📋
@@ -46,7 +46,7 @@ paver new component auth-service
 For operational procedures. Includes When to Use, Preconditions, Steps, Rollback, Verification, and Escalation sections.
 
 ```bash
-paver new runbook deploy-production
+pave new runbook deploy-production
 ```
 
 ### ADRs 📝
@@ -54,7 +54,7 @@ paver new runbook deploy-production
 Architecture Decision Records. Includes Status, Context, Decision, Consequences, and Alternatives Considered sections.
 
 ```bash
-paver new adr use-rust
+pave new adr use-rust
 ```
 
 ## Philosophy 🧠

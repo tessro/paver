@@ -1,13 +1,13 @@
 //! Generate prompts for AI agents to create PAVED-compliant documentation.
 //!
 //! This module provides functionality to generate structured prompts that help
-//! AI agents produce documentation that passes `paver check`.
+//! AI agents produce documentation that passes `pave check`.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::config::{CONFIG_FILENAME, PaverConfig, RulesSection};
+use crate::config::{CONFIG_FILENAME, PaveConfig, RulesSection};
 use crate::templates::{TemplateType, get_template};
 
 /// Output format for the generated prompt.
@@ -152,12 +152,12 @@ pub fn generate_prompt(options: &PromptOptions) -> Result<String> {
     }
 }
 
-/// Load configuration from .paver.toml or return defaults if not found.
-fn load_config_or_default() -> Result<PaverConfig> {
+/// Load configuration from .pave.toml or return defaults if not found.
+fn load_config_or_default() -> Result<PaveConfig> {
     if Path::new(CONFIG_FILENAME).exists() {
-        PaverConfig::load(CONFIG_FILENAME)
+        PaveConfig::load(CONFIG_FILENAME)
     } else {
-        Ok(PaverConfig::default())
+        Ok(PaveConfig::default())
     }
 }
 

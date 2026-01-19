@@ -24,11 +24,11 @@ jobs:
       - name: Run tests
         run: cargo test
 
-      - name: Build paver
+      - name: Build pave
         run: cargo build --release
 
       - name: Validate documentation
-        run: ./target/release/paver check --strict
+        run: ./target/release/pave check --strict
 
   build:
     name: Build ${{ matrix.target }}
@@ -75,20 +75,20 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
-          tar -czvf ../../../paver-${{ matrix.target }}.tar.gz paver
+          tar -czvf ../../../pave-${{ matrix.target }}.tar.gz pave
 
       - name: Create archive (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ../../../paver-${{ matrix.target }}.zip paver.exe
+          7z a ../../../pave-${{ matrix.target }}.zip pave.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: paver-${{ matrix.target }}
-          path: paver-${{ matrix.target }}.*
+          name: pave-${{ matrix.target }}
+          path: pave-${{ matrix.target }}.*
 
   release:
     name: Create Release

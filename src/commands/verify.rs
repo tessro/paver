@@ -1,4 +1,4 @@
-//! Implementation of the `paver verify` command for running verification commands.
+//! Implementation of the `pave verify` command for running verification commands.
 
 use anyhow::{Context, Result};
 use regex::Regex;
@@ -10,13 +10,13 @@ use std::process::Command;
 use std::time::Duration;
 
 use crate::cli::OutputFormat;
-use crate::config::{CONFIG_FILENAME, PaverConfig, RulesSection};
+use crate::config::{CONFIG_FILENAME, PaveConfig, RulesSection};
 use crate::parser::ParsedDoc;
 use crate::verification::{
     OutputMatcher, VerificationItem, VerificationSpec, extract_verification_spec,
 };
 
-/// Arguments for the `paver verify` command.
+/// Arguments for the `pave verify` command.
 pub struct VerifyArgs {
     /// Specific files or directories to verify.
     pub paths: Vec<PathBuf>,
@@ -178,11 +178,11 @@ impl VerifyResults {
     }
 }
 
-/// Execute the `paver verify` command.
+/// Execute the `pave verify` command.
 pub fn execute(args: VerifyArgs) -> Result<()> {
     // Find and load config
     let config_path = find_config()?;
-    let config = PaverConfig::load(&config_path)?;
+    let config = PaveConfig::load(&config_path)?;
     let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
     // Determine paths to verify
@@ -470,7 +470,7 @@ fn run_command(
     }
 }
 
-/// Find the .paver.toml config file by walking up from the current directory.
+/// Find the .pave.toml config file by walking up from the current directory.
 fn find_config() -> Result<PathBuf> {
     let current_dir = env::current_dir().context("Failed to get current directory")?;
     let mut dir = current_dir.as_path();
@@ -757,7 +757,7 @@ mod tests {
 
     fn create_test_config(temp_dir: &TempDir) -> PathBuf {
         let config_content = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -768,7 +768,7 @@ max_lines = 300
 require_verification = true
 require_examples = true
 "#;
-        let config_path = temp_dir.path().join(".paver.toml");
+        let config_path = temp_dir.path().join(".pave.toml");
         fs::write(&config_path, config_content).unwrap();
         config_path
     }

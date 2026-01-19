@@ -1,7 +1,7 @@
-# Paver configuration file
-# See https://github.com/tessro/paver for documentation
+# Pave configuration file
+# See https://github.com/tessro/pave for documentation
 
-[paver]
+[pave]
 version = "0.1"
 
 [docs]

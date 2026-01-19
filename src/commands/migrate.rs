@@ -1,6 +1,6 @@
 //! Migrate command for bulk insertion of missing PAVED sections.
 //!
-//! This module implements the `paver migrate` command which helps bulk-update
+//! This module implements the `pave migrate` command which helps bulk-update
 //! existing documentation by inserting missing PAVED sections with placeholder content.
 
 use anyhow::{Context, Result};
@@ -10,7 +10,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::config::{CONFIG_FILENAME, PaverConfig};
+use crate::config::{CONFIG_FILENAME, PaveConfig};
 use crate::parser::{CodeBlockTracker, ParsedDoc};
 use crate::rules::{DocType, detect_doc_type};
 
@@ -254,7 +254,7 @@ fn collect_markdown_files_recursive(dir: &Path, files: &mut Vec<PathBuf>) -> Res
                     | ".github"
                     | "templates"
                     | "_site"
-                    | ".paver"
+                    | ".pave"
                     | "vendor"
                     | "build"
             ) {
@@ -437,7 +437,7 @@ fn prompt_user(file: &FileAnalysis) -> bool {
 pub fn execute(args: MigrateArgs) -> Result<()> {
     // Find and load config
     let config_path = find_config()?;
-    let config = PaverConfig::load(&config_path)?;
+    let config = PaveConfig::load(&config_path)?;
     let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
     // Determine paths to process
@@ -668,13 +668,13 @@ mod tests {
 
     fn create_test_config(temp_dir: &TempDir) -> PathBuf {
         let config_content = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "docs"
 "#;
-        let config_path = temp_dir.path().join(".paver.toml");
+        let config_path = temp_dir.path().join(".pave.toml");
         fs::write(&config_path, config_content).unwrap();
         config_path
     }

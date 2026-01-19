@@ -2,19 +2,19 @@
 
 ## Purpose
 
-The prompt generation system creates structured prompts for AI agents to produce PAVED-compliant documentation. It packages the PAVED framework requirements, project-specific rules, templates, and optional context into a single prompt that guides AI assistants to create documentation that passes `paver check`.
+The prompt generation system creates structured prompts for AI agents to produce PAVED-compliant documentation. It packages the PAVED framework requirements, project-specific rules, templates, and optional context into a single prompt that guides AI assistants to create documentation that passes `pave check`.
 
 **Non-goals:**
 - Not an AI agent itself (it generates prompts, doesn't execute them)
 - Not a documentation generator (it produces prompts, the AI produces documentation)
-- Doesn't validate the AI's output (use `paver check` for that)
+- Doesn't validate the AI's output (use `pave check` for that)
 
 ## Interface
 
 ### CLI Usage
 
 ```bash
-paver prompt <doc_type> [options]
+pave prompt <doc_type> [options]
 ```
 
 | Argument | Description |
@@ -59,14 +59,14 @@ Create a PAVED component document for: auth service
 
 The generated prompt includes:
 1. **PAVED Structure** - Required sections for the document type
-2. **Project Rules** - Configured limits and requirements from `.paver.toml`
-3. **Template** - Starting structure from paver's built-in templates
+2. **Project Rules** - Configured limits and requirements from `.pave.toml`
+3. **Template** - Starting structure from pave's built-in templates
 4. **Context** (optional) - Existing document content or source files
 5. **Task** - Clear instruction on what to create or update
 
 ## Configuration
 
-Prompt generation uses the standard `.paver.toml` configuration to read project rules:
+Prompt generation uses the standard `.pave.toml` configuration to read project rules:
 
 ```toml
 [rules]
@@ -75,26 +75,26 @@ require_verification = true  # Tells AI to include runnable commands
 require_examples = true      # Tells AI to include output examples
 ```
 
-No additional configuration is required. If `.paver.toml` doesn't exist, default rules are used.
+No additional configuration is required. If `.pave.toml` doesn't exist, default rules are used.
 
 ## Verification
 
 Generate a prompt for a new component:
 
 ```bash
-./target/release/paver prompt component --for "auth service"
+./target/release/pave prompt component --for "auth service"
 ```
 
 Verify the prompt includes required sections:
 
 ```bash
-./target/release/paver prompt component --for "test" | grep -q "## PAVED Structure"
+./target/release/pave prompt component --for "test" | grep -q "## PAVED Structure"
 ```
 
 Generate JSON output and verify structure:
 
 ```bash
-./target/release/paver prompt component --for "test" --output json | jq -e '.prompt and .template and .rules'
+./target/release/pave prompt component --for "test" --output json | jq -e '.prompt and .template and .rules'
 ```
 
 Run the unit tests:
@@ -108,7 +108,7 @@ cargo test prompt
 ### Generate Prompt for New Component
 
 ```bash
-paver prompt component --for "user authentication"
+pave prompt component --for "user authentication"
 ```
 
 Output includes PAVED sections, project rules, template, and task instruction.
@@ -116,7 +116,7 @@ Output includes PAVED sections, project rules, template, and task instruction.
 ### Generate Prompt to Update Existing Doc
 
 ```bash
-paver prompt component --update docs/components/auth.md --for "authentication"
+pave prompt component --update docs/components/auth.md --for "authentication"
 ```
 
 The prompt includes the existing document content under "Context" so the AI can preserve existing content while making updates.
@@ -124,7 +124,7 @@ The prompt includes the existing document content under "Context" so the AI can 
 ### Include Source Code as Context
 
 ```bash
-paver prompt component --for "parser" --context src/parser.rs --context src/ast.rs
+pave prompt component --for "parser" --context src/parser.rs --context src/ast.rs
 ```
 
 Source files are included in the prompt under "Context" sections, helping the AI understand the implementation.
@@ -132,7 +132,7 @@ Source files are included in the prompt under "Context" sections, helping the AI
 ### JSON Output for Automation
 
 ```bash
-paver prompt component --for "api" --output json | jq '.prompt' > prompt.txt
+pave prompt component --for "api" --output json | jq '.prompt' > prompt.txt
 ```
 
 Use JSON output to extract specific fields or integrate with scripts.
@@ -140,7 +140,7 @@ Use JSON output to extract specific fields or integrate with scripts.
 ### Generate Runbook Prompt
 
 ```bash
-paver prompt runbook --for "deploy to production"
+pave prompt runbook --for "deploy to production"
 ```
 
 Runbook prompts include different PAVED sections: When to Use, Preconditions, Steps, Rollback, Verification, and Escalation.
@@ -148,7 +148,7 @@ Runbook prompts include different PAVED sections: When to Use, Preconditions, St
 ### Generate ADR Prompt
 
 ```bash
-paver prompt adr --for "use PostgreSQL for storage"
+pave prompt adr --for "use PostgreSQL for storage"
 ```
 
 ADR prompts include: Status, Context, Decision, Consequences, and Alternatives Considered.
@@ -158,12 +158,12 @@ ADR prompts include: Status, Context, Decision, Consequences, and Alternatives C
 - **Context files must exist**: The command fails if `--context` paths don't exist. Verify file paths before running.
 - **Large context may exceed token limits**: Including many or large source files can produce prompts that exceed AI context windows. Be selective about what context to include.
 - **Update path must be readable**: When using `--update`, the file must exist and be readable.
-- **Rules come from `.paver.toml`**: The prompt reflects your project's configured rules. Ensure `.paver.toml` is set up correctly for accurate prompts.
+- **Rules come from `.pave.toml`**: The prompt reflects your project's configured rules. Ensure `.pave.toml` is set up correctly for accurate prompts.
 - **Template is embedded**: The prompt includes the full template, which may be verbose for simple tasks.
 
 ## Decisions
 
-**Why generate prompts instead of documentation?** AI capabilities vary and improve over time. Generating prompts lets users choose their preferred AI tool and model, rather than coupling paver to a specific AI service.
+**Why generate prompts instead of documentation?** AI capabilities vary and improve over time. Generating prompts lets users choose their preferred AI tool and model, rather than coupling pave to a specific AI service.
 
 **Why include templates in prompts?** Templates provide concrete structure that guides AI output format. Without them, AI assistants often produce inconsistent section structures.
 

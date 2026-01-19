@@ -1,4 +1,4 @@
-//! Implementation of the `paver new` command for scaffolding documents.
+//! Implementation of the `pave new` command for scaffolding documents.
 
 use anyhow::{Context, Result, bail};
 use std::fs;
@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::templates::{TemplateType, get_template};
 
-/// Arguments for the `paver new` command.
+/// Arguments for the `pave new` command.
 pub struct NewArgs {
     /// Document type: component, runbook, adr
     pub doc_type: TemplateType,
@@ -16,7 +16,7 @@ pub struct NewArgs {
     pub output: Option<PathBuf>,
 }
 
-/// Execute the `paver new` command.
+/// Execute the `pave new` command.
 pub fn execute(args: NewArgs) -> Result<()> {
     // Determine output path
     let output_path = args
@@ -50,7 +50,7 @@ pub fn execute(args: NewArgs) -> Result<()> {
     );
     println!("\nNext steps:");
     println!("  1. Open the file and fill in the sections");
-    println!("  2. Run `paver check` to validate the document");
+    println!("  2. Run `pave check` to validate the document");
 
     Ok(())
 }

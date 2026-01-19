@@ -1,4 +1,4 @@
-//! Command implementations for paver CLI.
+//! Command implementations for pave CLI.
 
 pub mod adopt;
 pub mod build;

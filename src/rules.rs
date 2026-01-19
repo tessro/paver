@@ -1,7 +1,7 @@
 //! Validation rules engine for PAVED documents.
 //!
 //! This module provides a rules engine that validates parsed PAVED documents
-//! against configurable rules from `.paver.toml`.
+//! against configurable rules from `.pave.toml`.
 
 use std::path::{Path, PathBuf};
 

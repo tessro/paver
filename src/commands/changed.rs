@@ -1,4 +1,4 @@
-//! Implementation of the `paver changed` command for detecting impacted documentation.
+//! Implementation of the `pave changed` command for detecting impacted documentation.
 //!
 //! This module analyzes git diffs and reports which documentation should be reviewed
 //! or updated based on code-to-doc mappings defined in the docs.
@@ -12,9 +12,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::cli::ChangedOutputFormat;
-use crate::config::{CONFIG_FILENAME, PaverConfig};
+use crate::config::{CONFIG_FILENAME, PaveConfig};
 
-/// Arguments for the `paver changed` command.
+/// Arguments for the `pave changed` command.
 pub struct ChangedArgs {
     /// Git ref to compare against.
     pub base: Option<String>,
@@ -62,11 +62,11 @@ pub struct ChangedResults {
     pub missing_updates: Vec<PathBuf>,
 }
 
-/// Execute the `paver changed` command.
+/// Execute the `pave changed` command.
 pub fn execute(args: ChangedArgs) -> Result<()> {
     // Find and load config
     let config_path = find_config()?;
-    let config = PaverConfig::load(&config_path)?;
+    let config = PaveConfig::load(&config_path)?;
     let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
     let docs_root = config_dir.join(&config.docs.root);
 
@@ -129,7 +129,7 @@ pub fn execute(args: ChangedArgs) -> Result<()> {
     Ok(())
 }
 
-/// Find the .paver.toml config file by walking up from the current directory.
+/// Find the .pave.toml config file by walking up from the current directory.
 fn find_config() -> Result<PathBuf> {
     let current_dir = env::current_dir().context("Failed to get current directory")?;
     let mut dir = current_dir.as_path();

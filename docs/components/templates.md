@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The templates system provides scaffolding for new PAVED documents. When you run `paver new`, templates ensure that new documents start with the correct structure, sections, and guidance comments for their document type.
+The templates system provides scaffolding for new PAVED documents. When you run `pave new`, templates ensure that new documents start with the correct structure, sections, and guidance comments for their document type.
 
 **Non-goals:**
 - Not a static site generator (templates are for scaffolding, not rendering)
@@ -29,10 +29,10 @@ pub fn get_template(template_type: TemplateType) -> &'static str
 
 Returns the template content for a given type. Built-in templates are embedded in the binary at compile time using `include_str!`.
 
-### paver new Command
+### pave new Command
 
 ```bash
-paver new <type> <name> [--output <path>]
+pave new <type> <name> [--output <path>]
 ```
 
 | Argument | Description |
@@ -48,16 +48,16 @@ Default output paths:
 
 ## Configuration
 
-The templates system uses built-in templates embedded in the paver binary. No configuration is required to use templates.
+The templates system uses built-in templates embedded in the pave binary. No configuration is required to use templates.
 
-The config schema includes fields for future custom template support (`docs.templates`, `templates.component`, `templates.runbook`, `templates.adr`), but custom template loading is not yet implemented. Currently, `paver new` always uses the built-in templates.
+The config schema includes fields for future custom template support (`docs.templates`, `templates.component`, `templates.runbook`, `templates.adr`), but custom template loading is not yet implemented. Currently, `pave new` always uses the built-in templates.
 
 ## Verification
 
 Verify templates are working:
 
 ```bash
-./target/release/paver new component test-template --output /tmp/test-component.md && grep "## Purpose" /tmp/test-component.md && rm /tmp/test-component.md
+./target/release/pave new component test-template --output /tmp/test-component.md && grep "## Purpose" /tmp/test-component.md && rm /tmp/test-component.md
 ```
 
 Verify all template types have required sections:
@@ -71,7 +71,7 @@ cargo test templates
 ### Create a Component Doc
 
 ```bash
-paver new component auth-service
+pave new component auth-service
 # Creates: docs/components/auth-service.md
 # Title: "# Auth Service"
 ```
@@ -79,7 +79,7 @@ paver new component auth-service
 ### Create a Runbook
 
 ```bash
-paver new runbook deploy-production
+pave new runbook deploy-production
 # Creates: docs/runbooks/deploy-production.md
 # Title: "# Runbook: Deploy Production"
 ```
@@ -87,7 +87,7 @@ paver new runbook deploy-production
 ### Create an ADR
 
 ```bash
-paver new adr use-postgres
+pave new adr use-postgres
 # Creates: docs/adrs/use-postgres.md
 # Title: "# ADR: Use Postgres"
 ```
@@ -95,7 +95,7 @@ paver new adr use-postgres
 ### Use Custom Output Path
 
 ```bash
-paver new component my-service --output docs/services/my-service.md
+pave new component my-service --output docs/services/my-service.md
 # Creates: docs/services/my-service.md
 ```
 
@@ -104,11 +104,11 @@ paver new component my-service --output docs/services/my-service.md
 - **Placeholder replacement is exact**: Only the specific placeholder for each type is replaced (`{Component Name}`, `{Task Name}`, `{Title}`). Other `{...}` patterns are left unchanged.
 - **Name conversion**: Names are converted from kebab-case or snake_case to Title Case. `auth-service` becomes `Auth Service`.
 - **No nested directories**: The default output paths don't create nested subdirectories beyond `docs/components/`, `docs/runbooks/`, and `docs/adrs/`.
-- **File already exists**: `paver new` will fail if the output file already exists. Use `--output` to specify a different path.
+- **File already exists**: `pave new` will fail if the output file already exists. Use `--output` to specify a different path.
 
 ## Decisions
 
-**Why embedded templates?** Built-in templates are embedded at compile time using `include_str!`. This ensures paver works out of the box without external dependencies or installation steps.
+**Why embedded templates?** Built-in templates are embedded at compile time using `include_str!`. This ensures pave works out of the box without external dependencies or installation steps.
 
 **Why simple placeholder substitution?** Complex templating engines (Tera, Handlebars) add dependencies and learning curves. Simple string replacement covers the common case (document title) and keeps templates easy to read.
 

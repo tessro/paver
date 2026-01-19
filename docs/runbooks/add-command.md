@@ -1,7 +1,7 @@
-# Runbook: Adding a New CLI Command to Paver
+# Runbook: Adding a New CLI Command to Pave
 
 ## When to Use
-Use this runbook when extending paver with a new CLI command. This applies when you need to add functionality that should be accessible via `paver <command>`.
+Use this runbook when extending pave with a new CLI command. This applies when you need to add functionality that should be accessible via `pave <command>`.
 
 ## Preconditions
 - Rust toolchain installed (via [rustup](https://rustup.rs/))
@@ -16,16 +16,16 @@ Use this runbook when extending paver with a new CLI command. This applies when 
 Create a new file at `src/commands/<newcmd>.rs`:
 
 ```rust
-//! Implementation of the `paver <newcmd>` command.
+//! Implementation of the `pave <newcmd>` command.
 
 use anyhow::Result;
 
-/// Arguments for the `paver <newcmd>` command.
+/// Arguments for the `pave <newcmd>` command.
 pub struct NewcmdArgs {
     // Add your command arguments here
 }
 
-/// Execute the `paver <newcmd>` command.
+/// Execute the `pave <newcmd>` command.
 pub fn execute(args: NewcmdArgs) -> Result<()> {
     // Implement command logic here
     Ok(())
@@ -77,7 +77,7 @@ pub enum Command {
 Edit `src/main.rs` to add a match arm for the new command:
 
 ```rust
-use paver::commands::newcmd;
+use pave::commands::newcmd;
 
 // Inside the match cli.command block:
 Command::Newcmd { some_arg, some_flag } => {
@@ -98,14 +98,14 @@ cargo test
 
 ```bash
 cargo build
-./target/debug/paver <newcmd> --help
-./target/debug/paver <newcmd> <args>
+./target/debug/pave <newcmd> --help
+./target/debug/pave <newcmd> <args>
 ```
 
 ### 7. Create component documentation
 
 ```bash
-paver new component <newcmd>
+pave new component <newcmd>
 ```
 
 Fill out the generated `docs/components/<newcmd>.md` with:
@@ -145,13 +145,13 @@ cargo test
 Validate PAVED documentation:
 
 ```bash
-./target/release/paver check
+./target/release/pave check
 ```
 
 Verify help text appears correctly:
 
 ```bash
-./target/release/paver --help
+./target/release/pave --help
 ```
 
 ## Examples
@@ -188,7 +188,7 @@ To add a command that displays documentation statistics:
    }
    ```
 
-5. Test: `cargo test && ./target/debug/paver stats --help`
+5. Test: `cargo test && ./target/debug/pave stats --help`
 
 ## Escalation
 
@@ -196,7 +196,7 @@ If you encounter issues:
 
 1. Check the [clap documentation](https://docs.rs/clap) for CLI argument syntax
 2. Review existing commands in `src/commands/` for patterns
-3. Open an issue on the paver repository with:
+3. Open an issue on the pave repository with:
    - What you were trying to add
    - Error messages or unexpected behavior
    - Steps you followed

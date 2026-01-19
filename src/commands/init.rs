@@ -1,4 +1,4 @@
-//! Implementation of the `paver init` command.
+//! Implementation of the `pave init` command.
 
 use anyhow::{Context, Result, bail};
 use std::fs;
@@ -8,11 +8,11 @@ use crate::cli::HookType;
 use crate::commands::hooks;
 use crate::templates::{TemplateType, get_template};
 
-/// Default content for the .paver.toml configuration file.
+/// Default content for the .pave.toml configuration file.
 fn default_config(docs_root: &str) -> String {
     format!(
         r#"# Paver configuration file
-# See https://github.com/tessro/paver for documentation
+# See https://github.com/tessro/pave for documentation
 
 [docs]
 # Root directory for documentation
@@ -62,11 +62,11 @@ pub fn run(args: InitArgs) -> Result<()> {
         .working_dir
         .clone()
         .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let config_path = base.join(".paver.toml");
+    let config_path = base.join(".pave.toml");
 
     // Check if already initialized
     if config_path.exists() && !args.force {
-        bail!("Project already initialized (.paver.toml exists). Use --force to overwrite.");
+        bail!("Project already initialized (.pave.toml exists). Use --force to overwrite.");
     }
 
     let docs_root = base.join(&args.docs_root);
@@ -80,9 +80,9 @@ pub fn run(args: InitArgs) -> Result<()> {
         )
     })?;
 
-    // Write .paver.toml
+    // Write .pave.toml
     fs::write(&config_path, default_config(&args.docs_root))
-        .context("Failed to write .paver.toml")?;
+        .context("Failed to write .pave.toml")?;
 
     // Write index.md
     let index_path = docs_root.join("index.md");
@@ -109,7 +109,7 @@ pub fn run(args: InitArgs) -> Result<()> {
     println!("Initialized PAVED documentation in {}/", args.docs_root);
     println!();
     println!("Created:");
-    println!("  .paver.toml              - Configuration file");
+    println!("  .pave.toml              - Configuration file");
     println!(
         "  {}/index.md          - Documentation index",
         args.docs_root
@@ -120,9 +120,9 @@ pub fn run(args: InitArgs) -> Result<()> {
     );
     println!();
     println!("Next steps:");
-    println!("  paver new component <name>  - Create a component doc");
-    println!("  paver new runbook <name>    - Create a runbook");
-    println!("  paver new adr <name>        - Create an ADR");
+    println!("  pave new component <name>  - Create a component doc");
+    println!("  pave new runbook <name>    - Create a runbook");
+    println!("  pave new adr <name>        - Create an ADR");
 
     Ok(())
 }
@@ -130,7 +130,7 @@ pub fn run(args: InitArgs) -> Result<()> {
 /// Install git hooks for documentation validation.
 fn install_git_hooks(base: &Path) -> Result<()> {
     // Use the shared hook installation from the hooks module
-    // init_mode=true means: silently skip if paver hook exists, warn for foreign hooks
+    // init_mode=true means: silently skip if pave hook exists, warn for foreign hooks
     // run_verify=false by default; users can enable via config or reinstall with --verify
     hooks::install_at(base, HookType::PreCommit, true, false)
 }
@@ -138,7 +138,7 @@ fn install_git_hooks(base: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::hooks::PAVER_HOOK_MARKER;
+    use crate::commands::hooks::PAVE_HOOK_MARKER;
     use std::fs;
     use tempfile::TempDir;
 
@@ -159,7 +159,7 @@ mod tests {
         };
         run(args).unwrap();
 
-        assert!(temp_dir.path().join(".paver.toml").exists());
+        assert!(temp_dir.path().join(".pave.toml").exists());
         assert!(temp_dir.path().join("docs/index.md").exists());
         assert!(temp_dir.path().join("docs/templates/component.md").exists());
         assert!(temp_dir.path().join("docs/templates/runbook.md").exists());
@@ -177,7 +177,7 @@ mod tests {
         };
         run(args).unwrap();
 
-        assert!(temp_dir.path().join(".paver.toml").exists());
+        assert!(temp_dir.path().join(".pave.toml").exists());
         assert!(temp_dir.path().join("custom/path/index.md").exists());
         assert!(
             temp_dir
@@ -187,7 +187,7 @@ mod tests {
         );
 
         // Verify config contains correct path
-        let config = fs::read_to_string(temp_dir.path().join(".paver.toml")).unwrap();
+        let config = fs::read_to_string(temp_dir.path().join(".pave.toml")).unwrap();
         assert!(config.contains("root = \"custom/path\""));
     }
 
@@ -271,8 +271,8 @@ mod tests {
         assert!(hook_path.exists());
 
         let content = fs::read_to_string(&hook_path).unwrap();
-        assert!(content.contains(PAVER_HOOK_MARKER));
-        assert!(content.contains("paver check"));
+        assert!(content.contains(PAVE_HOOK_MARKER));
+        assert!(content.contains("pave check"));
     }
 
     #[test]
@@ -349,11 +349,11 @@ mod tests {
         // Verify hook was NOT overwritten
         let content = fs::read_to_string(&hook_path).unwrap();
         assert!(content.contains("custom hook"));
-        assert!(!content.contains(PAVER_HOOK_MARKER));
+        assert!(!content.contains(PAVE_HOOK_MARKER));
     }
 
     #[test]
-    fn init_does_not_reinstall_paver_hook() {
+    fn init_does_not_reinstall_pave_hook() {
         let temp_dir = TempDir::new().unwrap();
         setup_git_repo(&temp_dir);
 
@@ -368,7 +368,7 @@ mod tests {
         let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
         let first_content = fs::read_to_string(&hook_path).unwrap();
 
-        // Second init should succeed without error (paver hook already installed)
+        // Second init should succeed without error (pave hook already installed)
         let args = InitArgs {
             force: true,
             working_dir: Some(temp_dir.path().to_path_buf()),

@@ -1,4 +1,4 @@
-//! Implementation of the `paver hooks` command.
+//! Implementation of the `pave hooks` command.
 
 use anyhow::{Context, Result, bail};
 use std::fs;
@@ -6,20 +6,20 @@ use std::path::Path;
 
 use crate::cli::HookType;
 
-/// Marker comment to identify paver-installed hooks.
-pub const PAVER_HOOK_MARKER: &str = "# Installed by paver";
+/// Marker comment to identify pave-installed hooks.
+pub const PAVE_HOOK_MARKER: &str = "# Installed by pave";
 
 /// Generate the hook script content for the given hook type.
 ///
-/// If `run_verify` is true, the hook will also run `paver verify --keep-going`
-/// after `paver check` passes.
+/// If `run_verify` is true, the hook will also run `pave verify --keep-going`
+/// after `pave check` passes.
 fn generate_hook_script(hook_type: HookType, run_verify: bool) -> String {
     let hook_name = hook_type.filename();
     let verify_section = if run_verify {
         r#"
     echo ""
     echo "Running PAVED verification..."
-    echo "$CHANGED_DOCS" | xargs paver verify --keep-going
+    echo "$CHANGED_DOCS" | xargs pave verify --keep-going
     exit $?
 "#
     } else {
@@ -29,18 +29,18 @@ fn generate_hook_script(hook_type: HookType, run_verify: bool) -> String {
     match hook_type {
         HookType::PreCommit => format!(
             r#"#!/bin/sh
-{PAVER_HOOK_MARKER}
+{PAVE_HOOK_MARKER}
 # PAVED documentation validation hook ({hook_name})
 
-# Get docs root from paver config, default to "docs"
-DOCS_ROOT=$(paver config get docs.root 2>/dev/null || echo "docs")
+# Get docs root from pave config, default to "docs"
+DOCS_ROOT=$(pave config get docs.root 2>/dev/null || echo "docs")
 
 # Get list of changed .md files in docs directory (staged files)
 CHANGED_DOCS=$(git diff --cached --name-only --diff-filter=ACM | grep "^$DOCS_ROOT/.*\.md$")
 
 if [ -n "$CHANGED_DOCS" ]; then
     echo "Validating PAVED documentation..."
-    echo "$CHANGED_DOCS" | xargs paver check
+    echo "$CHANGED_DOCS" | xargs pave check
     CHECK_STATUS=$?
     if [ $CHECK_STATUS -ne 0 ]; then
         exit $CHECK_STATUS
@@ -50,11 +50,11 @@ fi
         ),
         HookType::PrePush => format!(
             r#"#!/bin/sh
-{PAVER_HOOK_MARKER}
+{PAVE_HOOK_MARKER}
 # PAVED documentation validation hook ({hook_name})
 
-# Get docs root from paver config, default to "docs"
-DOCS_ROOT=$(paver config get docs.root 2>/dev/null || echo "docs")
+# Get docs root from pave config, default to "docs"
+DOCS_ROOT=$(pave config get docs.root 2>/dev/null || echo "docs")
 
 # Pre-push receives: remote_name remote_url on stdin: local_ref local_sha remote_ref remote_sha
 # We check docs changed between remote ref and local ref
@@ -74,7 +74,7 @@ while read local_ref local_sha remote_ref remote_sha; do
 
     if [ -n "$CHANGED_DOCS" ]; then
         echo "Validating PAVED documentation..."
-        echo "$CHANGED_DOCS" | xargs paver check
+        echo "$CHANGED_DOCS" | xargs pave check
         CHECK_STATUS=$?
         if [ $CHECK_STATUS -ne 0 ]; then
             exit $CHECK_STATUS
@@ -139,10 +139,10 @@ fn find_git_hooks_dir() -> Result<std::path::PathBuf> {
     bail!("Not a git repository (no .git directory found)")
 }
 
-/// Check if a hook file was installed by paver.
-fn is_paver_hook(path: &Path) -> bool {
+/// Check if a hook file was installed by pave.
+fn is_pave_hook(path: &Path) -> bool {
     if let Ok(content) = fs::read_to_string(path) {
-        content.contains(PAVER_HOOK_MARKER)
+        content.contains(PAVE_HOOK_MARKER)
     } else {
         false
     }
@@ -150,8 +150,8 @@ fn is_paver_hook(path: &Path) -> bool {
 
 /// Install a git hook for documentation validation.
 ///
-/// If `run_verify` is true, the hook will also run `paver verify --keep-going`
-/// after `paver check` passes.
+/// If `run_verify` is true, the hook will also run `pave verify --keep-going`
+/// after `pave check` passes.
 pub fn install(hook_type: HookType, force: bool, run_verify: bool) -> Result<()> {
     let hooks_dir = find_git_hooks_dir()?;
     install_hook_in_dir(&hooks_dir, hook_type, force, run_verify)
@@ -160,11 +160,11 @@ pub fn install(hook_type: HookType, force: bool, run_verify: bool) -> Result<()>
 /// Install a git hook at a specific base path (for use by init command).
 ///
 /// Options for `init_mode`:
-/// - If `true` (init mode): silently skips if paver hook exists, warns for foreign hooks
+/// - If `true` (init mode): silently skips if pave hook exists, warns for foreign hooks
 /// - If `false` (explicit install): follows normal install behavior with messages
 ///
-/// If `run_verify` is true, the hook will also run `paver verify --keep-going`
-/// after `paver check` passes.
+/// If `run_verify` is true, the hook will also run `pave verify --keep-going`
+/// after `pave check` passes.
 pub fn install_at(
     base: &Path,
     hook_type: HookType,
@@ -176,20 +176,20 @@ pub fn install_at(
 
     // Check if hook already exists
     if hook_path.exists() {
-        if is_paver_hook(&hook_path) {
-            // Already installed by paver, nothing to do
+        if is_pave_hook(&hook_path) {
+            // Already installed by pave, nothing to do
             return Ok(());
         } else {
             // Foreign hook exists
             if init_mode {
                 println!("Warning: pre-commit hook already exists, skipping hook installation.");
                 println!(
-                    "Run 'paver hooks install --force' to overwrite, or add 'paver check' manually."
+                    "Run 'pave hooks install --force' to overwrite, or add 'pave check' manually."
                 );
                 return Ok(());
             } else {
                 bail!(
-                    "Hook '{}' already exists (not installed by paver). Use --force to overwrite.",
+                    "Hook '{}' already exists (not installed by pave). Use --force to overwrite.",
                     hook_type.filename()
                 );
             }
@@ -228,17 +228,17 @@ fn install_hook_in_dir(
 
     // Check if hook already exists
     if hook_path.exists() {
-        if is_paver_hook(&hook_path) {
+        if is_pave_hook(&hook_path) {
             if !force {
                 println!(
-                    "Hook '{}' already installed by paver. Use --force to reinstall.",
+                    "Hook '{}' already installed by pave. Use --force to reinstall.",
                     hook_type.filename()
                 );
                 return Ok(());
             }
         } else if !force {
             bail!(
-                "Hook '{}' already exists (not installed by paver). Use --force to overwrite.",
+                "Hook '{}' already exists (not installed by pave). Use --force to overwrite.",
                 hook_type.filename()
             );
         }
@@ -275,10 +275,10 @@ pub fn uninstall(hook_type: HookType) -> Result<()> {
         return Ok(());
     }
 
-    // Safety check: only remove hooks installed by paver
-    if !is_paver_hook(&hook_path) {
+    // Safety check: only remove hooks installed by pave
+    if !is_pave_hook(&hook_path) {
         bail!(
-            "Hook '{}' was not installed by paver. Remove it manually if needed.",
+            "Hook '{}' was not installed by pave. Remove it manually if needed.",
             hook_type.filename()
         );
     }
@@ -335,8 +335,8 @@ mod tests {
         assert!(hook_path.exists());
 
         let content = fs::read_to_string(&hook_path).unwrap();
-        assert!(content.contains(PAVER_HOOK_MARKER));
-        assert!(content.contains("paver check"));
+        assert!(content.contains(PAVE_HOOK_MARKER));
+        assert!(content.contains("pave check"));
     }
 
     #[test]
@@ -352,7 +352,7 @@ mod tests {
         assert!(hook_path.exists());
 
         let content = fs::read_to_string(&hook_path).unwrap();
-        assert!(content.contains(PAVER_HOOK_MARKER));
+        assert!(content.contains(PAVE_HOOK_MARKER));
         assert!(content.contains("pre-push"));
     }
 
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn install_warns_if_paver_hook_exists() {
+    fn install_warns_if_pave_hook_exists() {
         let temp_dir = TempDir::new().unwrap();
         setup_git_repo(&temp_dir);
 
@@ -396,7 +396,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         setup_git_repo(&temp_dir);
 
-        // Create a non-paver hook
+        // Create a non-pave hook
         let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
         fs::write(&hook_path, "#!/bin/sh\necho 'custom hook'").unwrap();
 
@@ -409,7 +409,7 @@ mod tests {
             result
                 .unwrap_err()
                 .to_string()
-                .contains("not installed by paver")
+                .contains("not installed by pave")
         );
     }
 
@@ -418,7 +418,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         setup_git_repo(&temp_dir);
 
-        // Create a non-paver hook
+        // Create a non-pave hook
         let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
         fs::write(&hook_path, "#!/bin/sh\necho 'custom hook'").unwrap();
 
@@ -427,7 +427,7 @@ mod tests {
         });
 
         let content = fs::read_to_string(&hook_path).unwrap();
-        assert!(content.contains(PAVER_HOOK_MARKER));
+        assert!(content.contains(PAVE_HOOK_MARKER));
     }
 
     #[test]
@@ -465,7 +465,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         setup_git_repo(&temp_dir);
 
-        // Create a non-paver hook
+        // Create a non-pave hook
         let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
         fs::write(&hook_path, "#!/bin/sh\necho 'custom hook'").unwrap();
 
@@ -476,7 +476,7 @@ mod tests {
             result
                 .unwrap_err()
                 .to_string()
-                .contains("not installed by paver")
+                .contains("not installed by pave")
         );
     }
 
@@ -500,7 +500,7 @@ mod tests {
     #[test]
     fn generated_pre_commit_hook_uses_cached_diff() {
         let script = generate_hook_script(HookType::PreCommit, false);
-        assert!(script.contains("DOCS_ROOT=$(paver config get docs.root"));
+        assert!(script.contains("DOCS_ROOT=$(pave config get docs.root"));
         assert!(script.contains("git diff --cached"));
         assert!(script.contains("grep \"^$DOCS_ROOT/.*\\.md$\""));
     }
@@ -508,7 +508,7 @@ mod tests {
     #[test]
     fn generated_pre_push_hook_uses_ref_diff() {
         let script = generate_hook_script(HookType::PrePush, false);
-        assert!(script.contains("DOCS_ROOT=$(paver config get docs.root"));
+        assert!(script.contains("DOCS_ROOT=$(pave config get docs.root"));
         assert!(script.contains("while read local_ref local_sha"));
         assert!(script.contains("$remote_sha\"..\"$local_sha"));
         assert!(script.contains("grep \"^$DOCS_ROOT/.*\\.md$\""));
@@ -544,7 +544,7 @@ mod tests {
         assert!(hook_path.exists());
 
         let content = fs::read_to_string(&hook_path).unwrap();
-        assert!(content.contains(PAVER_HOOK_MARKER));
+        assert!(content.contains(PAVE_HOOK_MARKER));
     }
 
     #[test]
@@ -573,23 +573,23 @@ mod tests {
     #[test]
     fn generated_hook_without_verify_omits_verify() {
         let script = generate_hook_script(HookType::PreCommit, false);
-        assert!(script.contains("paver check"));
-        assert!(!script.contains("paver verify"));
+        assert!(script.contains("pave check"));
+        assert!(!script.contains("pave verify"));
     }
 
     #[test]
     fn generated_hook_with_verify_includes_verify() {
         let script = generate_hook_script(HookType::PreCommit, true);
-        assert!(script.contains("paver check"));
-        assert!(script.contains("paver verify --keep-going"));
+        assert!(script.contains("pave check"));
+        assert!(script.contains("pave verify --keep-going"));
         assert!(script.contains("Running PAVED verification"));
     }
 
     #[test]
     fn generated_pre_push_hook_with_verify() {
         let script = generate_hook_script(HookType::PrePush, true);
-        assert!(script.contains("paver check"));
-        assert!(script.contains("paver verify --keep-going"));
+        assert!(script.contains("pave check"));
+        assert!(script.contains("pave verify --keep-going"));
     }
 
     #[test]
@@ -603,7 +603,7 @@ mod tests {
 
         let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
         let content = fs::read_to_string(&hook_path).unwrap();
-        assert!(content.contains("paver check"));
-        assert!(content.contains("paver verify --keep-going"));
+        assert!(content.contains("pave check"));
+        assert!(content.contains("pave verify --keep-going"));
     }
 }

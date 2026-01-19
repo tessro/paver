@@ -13,7 +13,7 @@
 
 ## Verification
 <!-- How do you know it's working? Include test commands with expected output. -->
-<!-- Commands in bash blocks are executable via `paver verify`. -->
+<!-- Commands in bash blocks are executable via `pave verify`. -->
 
 Run the unit tests:
 ```bash

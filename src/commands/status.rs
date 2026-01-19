@@ -1,4 +1,4 @@
-//! Implementation of the `paver status` command for showing documentation health overview.
+//! Implementation of the `pave status` command for showing documentation health overview.
 
 use anyhow::{Context, Result};
 use serde::Serialize;
@@ -8,12 +8,15 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::cli::StatusOutputFormat;
-use crate::commands::hooks::{PAVER_HOOK_MARKER, find_git_hooks_dir_from};
-use crate::config::{CONFIG_FILENAME, PaverConfig};
+use crate::commands::hooks::{PAVE_HOOK_MARKER, find_git_hooks_dir_from};
+use crate::config::{CONFIG_FILENAME, PaveConfig};
 use crate::parser::ParsedDoc;
 use crate::rules::{DocType, RulesEngine, detect_doc_type};
 
-/// Arguments for the `paver status` command.
+/// File analysis result: (is_compliant, has_warnings, error_count, warning_count, doc_type)
+type FileAnalysisResult = (bool, bool, usize, usize, DocType);
+
+/// Arguments for the `pave status` command.
 pub struct StatusArgs {
     /// Specific files or directories to check.
     pub paths: Vec<PathBuf>,
@@ -115,7 +118,7 @@ impl StatusResults {
         let stats = self
             .type_stats
             .entry(type_name.to_string())
-            .or_insert_with(TypeStats::default);
+            .or_default();
         stats.total += 1;
 
         if is_compliant {
@@ -130,11 +133,11 @@ impl StatusResults {
     }
 }
 
-/// Execute the `paver status` command.
+/// Execute the `pave status` command.
 pub fn execute(args: StatusArgs) -> Result<()> {
     // Find and load config
     let config_path = find_config()?;
-    let config = PaverConfig::load(&config_path)?;
+    let config = PaveConfig::load(&config_path)?;
     let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
     // Determine paths to check
@@ -277,9 +280,9 @@ fn should_skip_file(path: &Path) -> bool {
 /// Returns None for files that should be skipped (index.md, templates).
 fn analyze_file(
     path: &Path,
-    config: &PaverConfig,
+    config: &PaveConfig,
     config_dir: &Path,
-) -> Result<Option<(bool, bool, usize, usize, DocType)>> {
+) -> Result<Option<FileAnalysisResult>> {
     // Skip index.md and template files (they don't count toward compliance)
     if should_skip_file(path) {
         return Ok(None);
@@ -320,20 +323,20 @@ fn analyze_file(
     )))
 }
 
-/// Check if pre-commit hook is installed by paver.
+/// Check if pre-commit hook is installed by pave.
 fn check_hooks_installed(config_dir: &Path) -> bool {
     if let Ok(hooks_dir) = find_git_hooks_dir_from(config_dir) {
         let pre_commit = hooks_dir.join("pre-commit");
-        if pre_commit.exists() {
-            if let Ok(content) = std::fs::read_to_string(&pre_commit) {
-                return content.contains(PAVER_HOOK_MARKER);
-            }
+        if pre_commit.exists()
+            && let Ok(content) = std::fs::read_to_string(&pre_commit)
+        {
+            return content.contains(PAVE_HOOK_MARKER);
         }
     }
     false
 }
 
-/// Find the .paver.toml config file by walking up from the current directory.
+/// Find the .pave.toml config file by walking up from the current directory.
 fn find_config() -> Result<PathBuf> {
     let current_dir = env::current_dir().context("Failed to get current directory")?;
     let mut dir = current_dir.as_path();
@@ -547,24 +550,24 @@ fn output_text(results: &StatusResults) {
     }
 
     // Recent changes section
-    if let Some(ref changes) = results.recent_changes {
-        if !changes.is_empty() {
-            println!();
-            println!("Recent Changes:");
-            for change in changes {
-                let status_indicator = if change.is_compliant {
-                    if change.warning_count > 0 { "!" } else { "✓" }
-                } else {
-                    "✗"
-                };
-                println!(
-                    "  {}: {} ({} {})",
-                    change.change_type,
-                    change.path.display(),
-                    change.summary,
-                    status_indicator
-                );
-            }
+    if let Some(ref changes) = results.recent_changes
+        && !changes.is_empty()
+    {
+        println!();
+        println!("Recent Changes:");
+        for change in changes {
+            let status_indicator = if change.is_compliant {
+                if change.warning_count > 0 { "!" } else { "✓" }
+            } else {
+                "✗"
+            };
+            println!(
+                "  {}: {} ({} {})",
+                change.change_type,
+                change.path.display(),
+                change.summary,
+                status_indicator
+            );
         }
     }
 
@@ -596,7 +599,7 @@ fn output_text(results: &StatusResults) {
 
     // Helpful footer
     println!();
-    println!("Run 'paver check' for details or 'paver hooks install' to add git hooks.");
+    println!("Run 'pave check' for details or 'pave hooks install' to add git hooks.");
 }
 
 /// Output results in JSON format.
@@ -614,7 +617,7 @@ mod tests {
 
     fn create_test_config(temp_dir: &TempDir) -> PathBuf {
         let config_content = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -625,7 +628,7 @@ max_lines = 300
 require_verification = true
 require_examples = true
 "#;
-        let config_path = temp_dir.path().join(".paver.toml");
+        let config_path = temp_dir.path().join(".pave.toml");
         fs::write(&config_path, config_content).unwrap();
         config_path
     }
@@ -714,7 +717,7 @@ This document is missing required sections.
         let _config_path = create_test_config(&temp_dir);
         let doc_path = create_valid_doc(&temp_dir, "valid.md");
 
-        let config = PaverConfig::load(temp_dir.path().join(".paver.toml")).unwrap();
+        let config = PaveConfig::load(temp_dir.path().join(".pave.toml")).unwrap();
         let result = analyze_file(&doc_path, &config, temp_dir.path()).unwrap();
 
         let (is_compliant, _, error_count, _, _) = result.expect("File should not be skipped");
@@ -728,7 +731,7 @@ This document is missing required sections.
         let _config_path = create_test_config(&temp_dir);
         let doc_path = create_invalid_doc(&temp_dir, "invalid.md");
 
-        let config = PaverConfig::load(temp_dir.path().join(".paver.toml")).unwrap();
+        let config = PaveConfig::load(temp_dir.path().join(".pave.toml")).unwrap();
         let result = analyze_file(&doc_path, &config, temp_dir.path()).unwrap();
 
         let (is_compliant, _, error_count, _, _) = result.expect("File should not be skipped");
@@ -747,7 +750,7 @@ This document is missing required sections.
         let index_path = docs_dir.join("index.md");
         fs::write(&index_path, "# Index\n\nJust links here.").unwrap();
 
-        let config = PaverConfig::load(temp_dir.path().join(".paver.toml")).unwrap();
+        let config = PaveConfig::load(temp_dir.path().join(".pave.toml")).unwrap();
         let result = analyze_file(&index_path, &config, temp_dir.path()).unwrap();
 
         // index.md should be skipped (None returned)
@@ -765,7 +768,7 @@ This document is missing required sections.
         let template_path = templates_dir.join("component.md");
         fs::write(&template_path, "# {Name}\n\n## Purpose\nDescribe.").unwrap();
 
-        let config = PaverConfig::load(temp_dir.path().join(".paver.toml")).unwrap();
+        let config = PaveConfig::load(temp_dir.path().join(".pave.toml")).unwrap();
         let result = analyze_file(&template_path, &config, temp_dir.path()).unwrap();
 
         // Templates should be skipped (None returned)

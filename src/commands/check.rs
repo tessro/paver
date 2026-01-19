@@ -1,4 +1,4 @@
-//! Implementation of the `paver check` command for validating PAVED documents.
+//! Implementation of the `pave check` command for validating PAVED documents.
 
 use anyhow::{Context, Result};
 use serde::Serialize;
@@ -8,11 +8,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::cli::OutputFormat;
-use crate::config::{CONFIG_FILENAME, PaverConfig};
+use crate::config::{CONFIG_FILENAME, PaveConfig};
 use crate::parser::ParsedDoc;
 use crate::rules::{RulesEngine, detect_doc_type, get_type_specific_rules};
 
-/// Arguments for the `paver check` command.
+/// Arguments for the `pave check` command.
 pub struct CheckArgs {
     /// Specific files or directories to check.
     pub paths: Vec<PathBuf>,
@@ -181,7 +181,7 @@ fn is_leap_year(year: i32) -> bool {
 }
 
 /// Determine if gradual mode is active based on config, CLI flags, and deadline.
-fn is_gradual_mode_active(config: &PaverConfig, args: &CheckArgs) -> bool {
+fn is_gradual_mode_active(config: &PaveConfig, args: &CheckArgs) -> bool {
     // --strict always disables gradual mode
     if args.strict {
         return false;
@@ -210,11 +210,11 @@ fn is_gradual_mode_active(config: &PaverConfig, args: &CheckArgs) -> bool {
     false
 }
 
-/// Execute the `paver check` command.
+/// Execute the `pave check` command.
 pub fn execute(args: CheckArgs) -> Result<()> {
     // Find and load config
     let config_path = find_config()?;
-    let config = PaverConfig::load(&config_path)?;
+    let config = PaveConfig::load(&config_path)?;
     let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
     // Determine paths to check
@@ -304,7 +304,7 @@ pub fn execute(args: CheckArgs) -> Result<()> {
     }
 }
 
-/// Find the .paver.toml config file by walking up from the current directory.
+/// Find the .pave.toml config file by walking up from the current directory.
 fn find_config() -> Result<PathBuf> {
     let current_dir = env::current_dir().context("Failed to get current directory")?;
     let mut dir = current_dir.as_path();
@@ -434,7 +434,7 @@ fn collect_markdown_files_recursive(dir: &Path, files: &mut Vec<PathBuf>) -> Res
 }
 
 /// Check a single file against the validation rules.
-fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> Result<()> {
+fn check_file(path: &Path, config: &PaveConfig, results: &mut CheckResults) -> Result<()> {
     // Skip validation of index.md files - they are navigation documents
     // that don't need Verification and Examples sections
     if path.file_name().is_some_and(|f| f == "index.md") {
@@ -583,7 +583,7 @@ fn output_text(results: &CheckResults, gradual_mode: bool) {
     // In gradual mode, show how many issues would fail in strict mode
     if let Some(would_fail) = results.would_fail_count {
         println!(
-            "Note: {} issue{} would fail in strict mode. Run 'paver check --strict' to see.",
+            "Note: {} issue{} would fail in strict mode. Run 'pave check --strict' to see.",
             would_fail,
             if would_fail == 1 { "" } else { "s" }
         );
@@ -635,7 +635,7 @@ mod tests {
 
     fn create_test_config(temp_dir: &TempDir) -> PathBuf {
         let config_content = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -646,7 +646,7 @@ max_lines = 50
 require_verification = true
 require_examples = true
 "#;
-        let config_path = temp_dir.path().join(".paver.toml");
+        let config_path = temp_dir.path().join(".pave.toml");
         fs::write(&config_path, config_content).unwrap();
         config_path
     }
@@ -709,7 +709,7 @@ This document is missing required sections.
         let config_path = create_test_config(&temp_dir);
         let _doc_path = create_valid_doc(&temp_dir, "valid.md");
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let docs_dir = temp_dir.path().join("docs");
         let files = find_markdown_files(&[docs_dir]).unwrap();
 
@@ -728,7 +728,7 @@ This document is missing required sections.
         let config_path = create_test_config(&temp_dir);
         let doc_path = create_invalid_doc(&temp_dir, "invalid.md");
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -754,7 +754,7 @@ This document is missing required sections.
         // Config has max_lines = 50, so 100 lines should trigger warning
         let doc_path = create_long_doc(&temp_dir, "long.md", 100);
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -849,7 +849,7 @@ This document is missing required sections.
         let index_content = "# Documentation Index\n\nJust navigation links here.\n";
         fs::write(docs_dir.join("index.md"), index_content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&docs_dir.join("index.md"), &config, &mut results).unwrap();
 
@@ -869,7 +869,7 @@ This document is missing required sections.
         let template_content = "# {Component Name}\n\n## Purpose\n\nDescribe here.\n";
         fs::write(templates_dir.join("component.md"), template_content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&templates_dir.join("component.md"), &config, &mut results).unwrap();
 
@@ -914,7 +914,7 @@ This document is missing required sections.
 
     fn create_test_config_with_type_rules(temp_dir: &TempDir) -> PathBuf {
         let config_content = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -930,7 +930,7 @@ runbooks = true
 adrs = true
 components = true
 "#;
-        let config_path = temp_dir.path().join(".paver.toml");
+        let config_path = temp_dir.path().join(".pave.toml");
         fs::write(&config_path, config_content).unwrap();
         config_path
     }
@@ -960,7 +960,7 @@ $ deploy.sh
         let doc_path = runbooks_dir.join("deploy.md");
         fs::write(&doc_path, content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1016,7 +1016,7 @@ $ deploy.sh
         let doc_path = runbooks_dir.join("deploy.md");
         fs::write(&doc_path, content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1048,7 +1048,7 @@ fn main() {}
         let doc_path = adr_dir.join("001-use-rust.md");
         fs::write(&doc_path, content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1107,7 +1107,7 @@ fn main() {}
         let doc_path = adr_dir.join("001-use-rust.md");
         fs::write(&doc_path, content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1151,7 +1151,7 @@ fn main() {}
         let doc_path = adr_dir.join("001-use-rust.md");
         fs::write(&doc_path, content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1189,7 +1189,7 @@ fn main() {}
         let doc_path = components_dir.join("auth.md");
         fs::write(&doc_path, content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1230,7 +1230,7 @@ fn main() {}
         let doc_path = components_dir.join("auth.md");
         fs::write(&doc_path, content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1265,7 +1265,7 @@ fn main() {}
         let doc_path = components_dir.join("auth.md");
         fs::write(&doc_path, content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1298,7 +1298,7 @@ $ run.sh
         let doc_path = docs_dir.join("guide.md");
         fs::write(&doc_path, content).unwrap();
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1309,7 +1309,7 @@ $ run.sh
     fn create_test_config_with_gradual_mode(temp_dir: &TempDir, gradual: bool) -> PathBuf {
         let config_content = format!(
             r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -1323,7 +1323,7 @@ gradual = {}
 "#,
             gradual
         );
-        let config_path = temp_dir.path().join(".paver.toml");
+        let config_path = temp_dir.path().join(".pave.toml");
         fs::write(&config_path, config_content).unwrap();
         config_path
     }
@@ -1331,7 +1331,7 @@ gradual = {}
     fn create_test_config_with_gradual_until(temp_dir: &TempDir, gradual_until: &str) -> PathBuf {
         let config_content = format!(
             r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -1346,7 +1346,7 @@ gradual_until = "{}"
 "#,
             gradual_until
         );
-        let config_path = temp_dir.path().join(".paver.toml");
+        let config_path = temp_dir.path().join(".pave.toml");
         fs::write(&config_path, config_content).unwrap();
         config_path
     }
@@ -1357,7 +1357,7 @@ gradual_until = "{}"
         let config_path = create_test_config_with_gradual_mode(&temp_dir, true);
         let doc_path = create_invalid_doc(&temp_dir, "invalid.md");
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let mut results = CheckResults::new();
         check_file(&doc_path, &config, &mut results).unwrap();
 
@@ -1394,7 +1394,7 @@ gradual_until = "{}"
         let temp_dir = TempDir::new().unwrap();
         let config_path = create_test_config_with_gradual_mode(&temp_dir, true);
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let args = CheckArgs {
             paths: vec![],
             format: OutputFormat::Text,
@@ -1412,7 +1412,7 @@ gradual_until = "{}"
         let temp_dir = TempDir::new().unwrap();
         let config_path = create_test_config_with_gradual_mode(&temp_dir, false); // Config has gradual=false
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let args = CheckArgs {
             paths: vec![],
             format: OutputFormat::Text,
@@ -1431,7 +1431,7 @@ gradual_until = "{}"
         // Use a date far in the future
         let config_path = create_test_config_with_gradual_until(&temp_dir, "2099-12-31");
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let args = CheckArgs {
             paths: vec![],
             format: OutputFormat::Text,
@@ -1450,7 +1450,7 @@ gradual_until = "{}"
         // Use a date in the past
         let config_path = create_test_config_with_gradual_until(&temp_dir, "2020-01-01");
 
-        let config = PaverConfig::load(&config_path).unwrap();
+        let config = PaveConfig::load(&config_path).unwrap();
         let args = CheckArgs {
             paths: vec![],
             format: OutputFormat::Text,

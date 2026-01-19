@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Paver is a CLI tool for validating and managing PAVED documentation. The implementation language choice affects:
+Pave is a CLI tool for validating and managing PAVED documentation. The implementation language choice affects:
 
 - **Distribution**: How easily the tool can be installed and run on different systems
 - **Performance**: Startup time and execution speed matter for developer workflows
@@ -14,7 +14,7 @@ Paver is a CLI tool for validating and managing PAVED documentation. The impleme
 The tool needs to be fast, reliable, and easy to distribute as a single binary.
 
 ## Decision
-Implement paver in Rust using:
+Implement pave in Rust using:
 
 - **clap**: For CLI argument parsing with derive macros
 - **serde**: For TOML/JSON configuration handling
@@ -50,7 +50,7 @@ Prerequisites: Install the Rust toolchain via [rustup](https://rustup.rs/).
 Verify the Rust implementation is working correctly:
 
 ```bash
-# Build paver (optional, cargo run will build automatically)
+# Build pave (optional, cargo run will build automatically)
 cargo build
 
 # Run the test suite
@@ -64,7 +64,7 @@ Expected: All tests pass, binary outputs version information.
 
 ## Examples
 
-### Building Paver
+### Building Pave
 
 ```bash
 # Debug build for development

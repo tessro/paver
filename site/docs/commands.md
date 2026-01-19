@@ -5,29 +5,29 @@ title: Commands
 
 # Commands Reference 📖
 
-Complete CLI reference for paver.
+Complete CLI reference for pave.
 
-## paver init
+## pave init
 
-Initialize paver in your project.
+Initialize pave in your project.
 
 ```bash
-paver init
+pave init
 ```
 
 **What it does:**
-- Creates `.paver.toml` config file
+- Creates `.pave.toml` config file
 - Sets up default `docs/` directory
 - Configures sensible defaults for rules
 
 ---
 
-## paver new
+## pave new
 
 Scaffold a new document from templates.
 
 ```bash
-paver new <type> <name>
+pave new <type> <name>
 ```
 
 **Arguments:**
@@ -41,13 +41,13 @@ paver new <type> <name>
 
 ```bash
 # Create a component doc
-paver new component auth-service
+pave new component auth-service
 
 # Create a runbook
-paver new runbook deploy-production
+pave new runbook deploy-production
 
 # Create an ADR
-paver new adr use-rust-for-cli
+pave new adr use-rust-for-cli
 ```
 
 **Output locations:**
@@ -57,12 +57,12 @@ paver new adr use-rust-for-cli
 
 ---
 
-## paver prompt
+## pave prompt
 
 Generate AI agent prompts for documentation tasks.
 
 ```bash
-paver prompt <type> [options]
+pave prompt <type> [options]
 ```
 
 **Arguments:**
@@ -82,23 +82,23 @@ paver prompt <type> [options]
 
 ```bash
 # Generate a prompt for creating docs
-paver prompt create
+pave prompt create
 
 # Generate with context
-paver prompt update --context src/auth.rs
+pave prompt update --context src/auth.rs
 
 # JSON output for programmatic use
-paver prompt create --json
+pave prompt create --json
 ```
 
 ---
 
-## paver index
+## pave index
 
 Generate a documentation index.
 
 ```bash
-paver index [options]
+pave index [options]
 ```
 
 **Options:**
@@ -112,13 +112,13 @@ paver index [options]
 
 ```bash
 # Generate index with defaults
-paver index
+pave index
 
 # Custom output location
-paver index --output docs/README.md
+pave index --output docs/README.md
 
 # Update existing index, keeping custom notes
-paver index --update
+pave index --update
 ```
 
 **What it does:**
@@ -130,12 +130,12 @@ paver index --update
 
 ---
 
-## paver check
+## pave check
 
 Validate documentation against rules.
 
 ```bash
-paver check [path]
+pave check [path]
 ```
 
 **Arguments:**
@@ -153,20 +153,20 @@ paver check [path]
 
 ```bash
 # Check all docs
-paver check
+pave check
 
 # Check specific file
-paver check docs/components/auth.md
+pave check docs/components/auth.md
 ```
 
 ---
 
-## paver config
+## pave config
 
-Manage paver configuration.
+Manage pave configuration.
 
 ```bash
-paver config <subcommand>
+pave config <subcommand>
 ```
 
 **Subcommands:**
@@ -182,23 +182,23 @@ paver config <subcommand>
 
 ```bash
 # View all config
-paver config list
+pave config list
 
 # Get a specific value
-paver config get rules.max_lines
+pave config get rules.max_lines
 
 # Set a value
-paver config set rules.max_lines 500
+pave config set rules.max_lines 500
 
 # Find config file
-paver config path
+pave config path
 ```
 
 **Config keys:**
 
 | Key | Description | Default |
 |-----|-------------|---------|
-| `paver.version` | Config schema version | `"0.1"` |
+| `pave.version` | Config schema version | `"0.1"` |
 | `docs.root` | Documentation root directory | `"docs"` |
 | `docs.templates` | Custom templates path | `"templates"` |
 | `rules.max_lines` | Max lines per document | `300` |

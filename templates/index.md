@@ -11,14 +11,14 @@
 ## Components
 <!-- List and link to component documentation. -->
 
-- *No components documented yet. Use `paver new component <name>` to create one.*
+- *No components documented yet. Use `pave new component <name>` to create one.*
 
 ## Runbooks
 <!-- List and link to operational runbooks. -->
 
-- *No runbooks documented yet. Use `paver new runbook <name>` to create one.*
+- *No runbooks documented yet. Use `pave new runbook <name>` to create one.*
 
 ## Architecture Decisions
 <!-- List and link to ADRs. -->
 
-- *No ADRs documented yet. Use `paver new adr <name>` to create one.*
+- *No ADRs documented yet. Use `pave new adr <name>` to create one.*

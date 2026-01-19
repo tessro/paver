@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use toml::Value;
 
-const CONFIG_FILENAME: &str = ".paver.toml";
+const CONFIG_FILENAME: &str = ".pave.toml";
 
 /// Find the config file by walking up from current directory.
 pub fn find_config_path() -> Result<PathBuf> {

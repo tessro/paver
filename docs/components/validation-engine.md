@@ -10,10 +10,10 @@ Non-goals: This is not a general-purpose markdown parser. It does not check pros
 
 ### Entry Point
 
-The validation engine is invoked through the `paver check` command:
+The validation engine is invoked through the `pave check` command:
 
 ```bash
-paver check [PATH...]
+pave check [PATH...]
 ```
 
 | Argument | Description |
@@ -58,7 +58,7 @@ docs/file.md:5: error: missing required section: Verification
 
 ## Configuration
 
-Rules are configured in `.paver.toml` under the `[rules]` section:
+Rules are configured in `.pave.toml` under the `[rules]` section:
 
 ```toml
 [rules]
@@ -92,13 +92,13 @@ The **max_lines** rule produces an error if the document exceeds the configured 
 Test validation with a known-good document:
 
 ```bash
-./target/release/paver check docs/components/validation-engine.md
+./target/release/pave check docs/components/validation-engine.md
 ```
 
 Test that validation catches errors:
 
 ```bash
-echo "# No sections" > /tmp/bad.md && ./target/release/paver check /tmp/bad.md; rm /tmp/bad.md
+echo "# No sections" > /tmp/bad.md && ./target/release/pave check /tmp/bad.md; rm /tmp/bad.md
 ```
 
 Run the unit tests:
@@ -149,7 +149,7 @@ missing-sections.md:1: error: missing required section: Purpose
 ### Using JSON Output for CI
 
 ```bash
-paver check --format json | jq '.errors | length'
+pave check --format json | jq '.errors | length'
 ```
 
 ## Gotchas

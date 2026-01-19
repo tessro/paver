@@ -1,4 +1,4 @@
-<h1 align="center">🛣️ paver</h1>
+<h1 align="center">🛣️ pave</h1>
 
 <p align="center">A CLI tool for creating, validating, and managing documentation optimized for human+agent pairs.</p>
 
@@ -19,33 +19,33 @@ PAVED is a documentation framework that treats docs like APIs:
 cargo build --release
 
 # Initialize in your project
-paver init
+pave init
 
 # Create a new document
-paver new component my-service
+pave new component my-service
 
 # Validate your docs
-paver check
+pave check
 
 # Run verification commands
-paver verify
+pave verify
 
 # Generate index
-paver index
+pave index
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `paver init` | Initialize paver in your project |
-| `paver new <type> <name>` | Scaffold a new document |
-| `paver check` | Validate documents against rules |
-| `paver verify` | Run verification commands from docs |
-| `paver changed` | Show docs impacted by code changes |
-| `paver index` | Generate documentation index |
-| `paver prompt <type>` | Generate AI agent prompts |
-| `paver config` | Manage configuration |
+| `pave init` | Initialize pave in your project |
+| `pave new <type> <name>` | Scaffold a new document |
+| `pave check` | Validate documents against rules |
+| `pave verify` | Run verification commands from docs |
+| `pave changed` | Show docs impacted by code changes |
+| `pave index` | Generate documentation index |
+| `pave prompt <type>` | Generate AI agent prompts |
+| `pave config` | Manage configuration |
 
 ## Document Types
 
@@ -55,6 +55,6 @@ paver index
 
 ## Learn More
 
-- [Documentation](https://tessro.github.io/paver/)
-- [Manifesto](https://tessro.github.io/paver/docs/manifesto/)
-- [Getting Started](https://tessro.github.io/paver/docs/getting-started/)
+- [Documentation](https://tessro.github.io/pave/)
+- [Manifesto](https://tessro.github.io/pave/docs/manifesto/)
+- [Getting Started](https://tessro.github.io/pave/docs/getting-started/)

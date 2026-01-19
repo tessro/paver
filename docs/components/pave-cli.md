@@ -1,8 +1,8 @@
-# Paver CLI
+# Pave CLI
 
 ## Purpose
 
-Paver is a command-line tool for creating, validating, and managing PAVED documentation. It enforces structured documentation practices optimized for AI agents by providing templates, validation rules, and indexing capabilities.
+Pave is a command-line tool for creating, validating, and managing PAVED documentation. It enforces structured documentation practices optimized for AI agents by providing templates, validation rules, and indexing capabilities.
 
 **Non-goals:**
 - Not a static site generator (use separate tools like MkDocs or VitePress for that)
@@ -13,52 +13,52 @@ Paver is a command-line tool for creating, validating, and managing PAVED docume
 
 | Command | Description |
 |---------|-------------|
-| `paver init` | Initialize project with `.paver.toml` config and docs directory |
-| `paver new <type> <name>` | Scaffold a new document from template |
-| `paver check [path]` | Validate documentation against PAVED rules |
-| `paver verify [path]` | Run verification commands from documentation |
-| `paver index` | Generate documentation index |
-| `paver prompt <type>` | Generate AI prompts for documentation tasks |
-| `paver changed` | Show docs impacted by code changes |
-| `paver config <subcommand>` | View or modify configuration |
-| `paver hooks <subcommand>` | Manage git hooks for validation |
+| `pave init` | Initialize project with `.pave.toml` config and docs directory |
+| `pave new <type> <name>` | Scaffold a new document from template |
+| `pave check [path]` | Validate documentation against PAVED rules |
+| `pave verify [path]` | Run verification commands from documentation |
+| `pave index` | Generate documentation index |
+| `pave prompt <type>` | Generate AI prompts for documentation tasks |
+| `pave changed` | Show docs impacted by code changes |
+| `pave config <subcommand>` | View or modify configuration |
+| `pave hooks <subcommand>` | Manage git hooks for validation |
 
 ### Command Details
 
-**paver init**
+**pave init**
 ```bash
-paver init [--docs-root <path>] [--hooks] [--force]
+pave init [--docs-root <path>] [--hooks] [--force]
 ```
 - `--docs-root`: Set docs directory (default: `docs`)
 - `--hooks`: Also install git pre-commit hook
 - `--force`: Overwrite existing files
 
-**paver new**
+**pave new**
 ```bash
-paver new <type> <name> [--output <path>]
+pave new <type> <name> [--output <path>]
 ```
 - `type`: `component`, `runbook`, or `adr`
 - `name`: Document name (kebab-case recommended)
 - `--output`: Custom output path
 
-**paver check**
+**pave check**
 ```bash
-paver check [paths...] [--format <format>] [--strict]
+pave check [paths...] [--format <format>] [--strict]
 ```
 - `paths`: Files or directories to check (default: docs root)
 - `--format`: Output format (`text`, `json`, `github`)
 - `--strict`: Treat warnings as errors
 
-**paver index**
+**pave index**
 ```bash
-paver index [--output <path>] [--update]
+pave index [--output <path>] [--update]
 ```
 - `--output`: Output file path (default: `docs/index.md`)
 - `--update`: Preserve custom content sections when regenerating
 
-**paver prompt**
+**pave prompt**
 ```bash
-paver prompt <type> [--for <name>] [--update <path>] [--context <file>] [--output <format>]
+pave prompt <type> [--for <name>] [--update <path>] [--context <file>] [--output <format>]
 ```
 - `type`: `component`, `runbook`, or `adr`
 - `--for`: Name of the thing being documented
@@ -66,29 +66,29 @@ paver prompt <type> [--for <name>] [--update <path>] [--context <file>] [--outpu
 - `--context`: Include file content as context (repeatable)
 - `--output`: Output format (`text` or `json`)
 
-**paver config**
+**pave config**
 ```bash
-paver config get <key>
-paver config set <key> <value>
-paver config list
-paver config path
+pave config get <key>
+pave config set <key> <value>
+pave config list
+pave config path
 ```
 - `get`: Retrieve a config value by key
 - `set`: Update a config value
 - `list`: Show all configuration
 - `path`: Show config file path
 
-**paver changed**
+**pave changed**
 ```bash
-paver changed [--base <ref>] [--format <format>] [--strict]
+pave changed [--base <ref>] [--format <format>] [--strict]
 ```
 - `--base`: Git ref to compare against (default: `origin/main`, `origin/master`, or `HEAD~1`)
 - `--format`: Output format (`text` or `json`)
 - `--strict`: Fail if impacted docs weren't updated
 
-**paver verify**
+**pave verify**
 ```bash
-paver verify [paths...] [--format <format>] [--timeout <seconds>] [--keep-going] [--report <path>]
+pave verify [paths...] [--format <format>] [--timeout <seconds>] [--keep-going] [--report <path>]
 ```
 - `paths`: Files or directories to verify (default: docs root)
 - `--format`: Output format (`text`, `json`, or `github`)
@@ -96,30 +96,30 @@ paver verify [paths...] [--format <format>] [--timeout <seconds>] [--keep-going]
 - `--keep-going`: Continue running after first failure
 - `--report`: Write JSON report to file
 
-**paver hooks**
+**pave hooks**
 ```bash
-paver hooks install [--hook <type>] [--force]
-paver hooks uninstall [--hook <type>]
+pave hooks install [--hook <type>] [--force]
+pave hooks uninstall [--hook <type>]
 ```
 - `--hook`: `pre-commit` (default) or `pre-push`
 - `--force`: Overwrite existing hooks
 
 ## Configuration
 
-Configuration is stored in `.paver.toml` at the project root.
+Configuration is stored in `.pave.toml` at the project root.
 
 | Key | Description | Default |
 |-----|-------------|---------|
-| `paver.version` | Config schema version | `"0.1"` |
+| `pave.version` | Config schema version | `"0.1"` |
 | `docs.root` | Documentation root directory | `"docs"` |
 | `docs.templates` | Custom templates path | `"templates"` |
 | `rules.max_lines` | Max lines per document | `300` |
 | `rules.require_verification` | Require Verification section | `true` |
 | `rules.require_examples` | Require Examples section | `true` |
 
-Example `.paver.toml`:
+Example `.pave.toml`:
 ```toml
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -134,22 +134,22 @@ require_examples = true
 
 ## Verification
 
-Confirm paver is built and working:
+Confirm pave is built and working:
 
 ```bash
-cargo build --release && ./target/release/paver --version
+cargo build --release && ./target/release/pave --version
 ```
 
 Validate documentation:
 
 ```bash
-./target/release/paver check docs/
+./target/release/pave check docs/
 ```
 
 Show configuration:
 
 ```bash
-./target/release/paver config list
+./target/release/pave config list
 ```
 
 ## Examples
@@ -157,105 +157,105 @@ Show configuration:
 ### Initialize a new project
 ```bash
 # Basic initialization
-paver init
+pave init
 
 # With git hooks
-paver init --hooks
+pave init --hooks
 
 # Custom docs location
-paver init --docs-root documentation
+pave init --docs-root documentation
 ```
 
 ### Create documentation
 ```bash
 # Create a component doc
-paver new component auth-service
+pave new component auth-service
 # Creates: docs/components/auth-service.md
 
 # Create a runbook
-paver new runbook deploy-production
+pave new runbook deploy-production
 # Creates: docs/runbooks/deploy-production.md
 
 # Create an ADR
-paver new adr use-postgres
+pave new adr use-postgres
 # Creates: docs/adrs/use-postgres.md
 ```
 
 ### Validate documentation
 ```bash
 # Check all docs
-paver check
+pave check
 
 # Check specific file
-paver check docs/components/auth-service.md
+pave check docs/components/auth-service.md
 
 # Check with strict mode (warnings become errors)
-paver check --strict
+pave check --strict
 
 # JSON output for CI
-paver check --format json
+pave check --format json
 ```
 
 ### Generate index
 ```bash
 # Generate new index
-paver index
+pave index
 
 # Update existing index (preserves custom content)
-paver index --update
+pave index --update
 
 # Custom output path
-paver index --output docs/README.md
+pave index --output docs/README.md
 ```
 
 ### Check impacted docs
 ```bash
 # Show docs impacted by code changes since origin/main
-paver changed
+pave changed
 
 # Compare against a specific branch or commit
-paver changed --base feature-branch
+pave changed --base feature-branch
 
 # JSON output for CI integration
-paver changed --format json
+pave changed --format json
 
 # Fail in CI if impacted docs weren't updated
-paver changed --strict
+pave changed --strict
 ```
 
 ### Run verification commands
 ```bash
 # Run all verification commands from all docs
-paver verify
+pave verify
 
 # Verify a specific document
-paver verify docs/components/auth-service.md
+pave verify docs/components/auth-service.md
 
 # Continue running after failures
-paver verify --keep-going
+pave verify --keep-going
 
 # Write JSON report for CI
-paver verify --format json --report verify-results.json
+pave verify --format json --report verify-results.json
 
 # GitHub Actions annotations
-paver verify --format github
+pave verify --format github
 ```
 
 ## Gotchas
 
-- **Config not found**: Paver looks for `.paver.toml` in the current directory and parent directories. Run `paver init` to create one, or use `paver config path` to see where it's looking.
+- **Config not found**: Pave looks for `.pave.toml` in the current directory and parent directories. Run `pave init` to create one, or use `pave config path` to see where it's looking.
 - **Template not found**: Custom templates must be in the path specified by `docs.templates`. The built-in templates are used if no custom templates exist.
-- **Hook conflicts**: If a git hook already exists and wasn't installed by paver, use `--force` to overwrite or manually merge the hooks.
+- **Hook conflicts**: If a git hook already exists and wasn't installed by pave, use `--force` to overwrite or manually merge the hooks.
 - **Max lines exceeded**: Documents over `rules.max_lines` (default 300) fail validation. Split large docs into smaller, focused documents.
 - **Missing sections**: By default, `Verification` and `Examples` sections are required. Disable with `rules.require_verification = false` or `rules.require_examples = false` if needed.
 
 ## Decisions
 
-**Why Rust?** Paver is written in Rust for fast startup time and easy distribution as a single binary. This matters for git hooks where slow tools delay commits.
+**Why Rust?** Pave is written in Rust for fast startup time and easy distribution as a single binary. This matters for git hooks where slow tools delay commits.
 
 **Why TOML for config?** TOML is human-readable, widely supported, and matches Cargo's config format (familiar to Rust users). It's also simple enough for agents to reliably edit.
 
-**Why built-in templates?** Embedded templates ensure paver works out of the box. Custom templates can override them when teams need project-specific formats.
+**Why built-in templates?** Embedded templates ensure pave works out of the box. Custom templates can override them when teams need project-specific formats.
 
 **Why strict section requirements?** The `Verification` and `Examples` requirements enforce documentation quality. Docs without these sections are less useful for both humans and AI agents.
 

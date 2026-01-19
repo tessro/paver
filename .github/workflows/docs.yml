@@ -6,12 +6,12 @@ on:
     paths:
       - 'docs/**'
       - 'src/**'
-      - '.paver.toml'
+      - '.pave.toml'
   pull_request:
     paths:
       - 'docs/**'
       - 'src/**'
-      - '.paver.toml'
+      - '.pave.toml'
 
 jobs:
   validate:
@@ -27,14 +27,14 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Build paver
+      - name: Build pave
         run: cargo build --release
 
-      - name: Run paver check
-        run: ./target/release/paver check --strict
+      - name: Run pave check
+        run: ./target/release/pave check --strict
 
-      - name: Run paver verify
-        run: ./target/release/paver verify --keep-going
+      - name: Run pave verify
+        run: ./target/release/pave verify --keep-going
 
       - name: Check impacted docs
-        run: ./target/release/paver changed --strict
+        run: ./target/release/pave changed --strict

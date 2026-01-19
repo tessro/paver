@@ -5,7 +5,7 @@ use crate::templates::TemplateType;
 
 /// PAVED documentation tool - structured docs optimized for AI agents
 #[derive(Parser)]
-#[command(name = "paver")]
+#[command(name = "pave")]
 #[command(version, about, long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
@@ -55,7 +55,7 @@ pub enum MigrateOutputFormat {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Scan existing documentation to help onboard paver
+    /// Scan existing documentation to help onboard pave
     Adopt {
         /// Path to scan for documentation [default: auto-detect docs/, documentation/, or README.md]
         #[arg()]
@@ -65,11 +65,11 @@ pub enum Command {
         #[arg(long, default_value = "text", value_enum)]
         format: AdoptOutputFormat,
 
-        /// Print suggested .paver.toml settings
+        /// Print suggested .pave.toml settings
         #[arg(long)]
         suggest_config: bool,
 
-        /// Show what paver init would create (without creating)
+        /// Show what pave init would create (without creating)
         #[arg(long)]
         dry_run: bool,
     },
@@ -145,7 +145,7 @@ pub enum Command {
     #[command(subcommand)]
     Hooks(HooksCommand),
 
-    /// View or modify paver configuration
+    /// View or modify pave configuration
     #[command(subcommand)]
     Config(ConfigCommand),
 
@@ -309,7 +309,7 @@ pub enum Command {
     },
 }
 
-/// Output format for the `paver changed` command.
+/// Output format for the `pave changed` command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
 pub enum ChangedOutputFormat {
     /// Human-readable text output
@@ -319,7 +319,7 @@ pub enum ChangedOutputFormat {
     Json,
 }
 
-/// Output format for the `paver status` command.
+/// Output format for the `pave status` command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
 pub enum StatusOutputFormat {
     /// Human-readable text output
@@ -329,7 +329,7 @@ pub enum StatusOutputFormat {
     Json,
 }
 
-/// Output format for the `paver coverage` command.
+/// Output format for the `pave coverage` command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
 pub enum CoverageOutputFormat {
     /// Human-readable text output
@@ -362,7 +362,7 @@ pub enum ConfigCommand {
     Path,
 }
 
-/// Output format for the `paver check` command.
+/// Output format for the `pave check` command.
 #[derive(Debug, Clone, Copy, ValueEnum, Default)]
 pub enum OutputFormat {
     /// Human-readable text output
@@ -406,7 +406,7 @@ pub enum HooksCommand {
         #[arg(long)]
         force: bool,
 
-        /// Also run paver verify in the hook
+        /// Also run pave verify in the hook
         #[arg(long)]
         verify: bool,
     },

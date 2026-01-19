@@ -5,14 +5,14 @@ title: Onboarding Existing Projects
 
 # Onboarding Existing Projects
 
-Adopting paver in an existing codebase? This guide walks you through the process step by step.
+Adopting pave in an existing codebase? This guide walks you through the process step by step.
 
 ## Overview
 
-Adopting paver incrementally is the recommended approach for existing projects. Rather than converting all documentation at once, you'll:
+Adopting pave incrementally is the recommended approach for existing projects. Rather than converting all documentation at once, you'll:
 
 1. Assess your current documentation landscape
-2. Configure paver with gradual mode to avoid blocking CI
+2. Configure pave with gradual mode to avoid blocking CI
 3. Convert high-value docs first
 4. Expand coverage over time
 
@@ -23,10 +23,10 @@ Adopting paver incrementally is the recommended approach for existing projects. 
 
 ## Step 1: Assess Your Current Docs
 
-Run `paver adopt` to scan your existing documentation:
+Run `pave adopt` to scan your existing documentation:
 
 ```bash
-paver adopt
+pave adopt
 ```
 
 This command analyzes your project and reports:
@@ -38,27 +38,27 @@ This command analyzes your project and reports:
 For a suggested configuration based on your project:
 
 ```bash
-paver adopt --suggest-config
+pave adopt --suggest-config
 ```
 
-To see what `paver init` would create without making changes:
+To see what `pave init` would create without making changes:
 
 ```bash
-paver adopt --dry-run
+pave adopt --dry-run
 ```
 
 ## Step 2: Configure for Gradual Adoption
 
-Initialize paver with gradual mode enabled:
+Initialize pave with gradual mode enabled:
 
 ```bash
-paver init
+pave init
 ```
 
-Then edit `.paver.toml` to enable gradual mode:
+Then edit `.pave.toml` to enable gradual mode:
 
 ```toml
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -75,8 +75,8 @@ gradual_until = "2026-04-18"  # 3 months from adoption
 
 **Why gradual mode?**
 
-With `gradual = true`, paver treats validation errors as warnings. This lets you:
-- Add paver to CI without breaking builds
+With `gradual = true`, pave treats validation errors as warnings. This lets you:
+- Add pave to CI without breaking builds
 - Fix docs incrementally as you touch them
 - Track progress toward full compliance
 
@@ -134,12 +134,12 @@ Add copy-paste ready examples:
 After updating docs, validate them:
 
 ```bash
-paver check
+pave check
 ```
 
 ## Step 4: Set Up CI Integration
 
-Add paver validation to your CI pipeline. Example for GitHub Actions:
+Add pave validation to your CI pipeline. Example for GitHub Actions:
 
 ```yaml
 # .github/workflows/docs.yml
@@ -153,14 +153,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install paver
+      - name: Install pave
         run: cargo install --path .
 
       - name: Validate documentation
-        run: paver check --format github
+        run: pave check --format github
 
       - name: Run verification commands
-        run: paver verify --keep-going
+        run: pave verify --keep-going
 ```
 
 The `--format github` flag outputs annotations that appear inline on PRs.
@@ -174,19 +174,19 @@ For more CI patterns including GitLab CI, JSON output, and troubleshooting, see 
 Install pre-commit hooks to catch issues before they're pushed:
 
 ```bash
-paver hooks install
+pave hooks install
 ```
 
 To also run verification commands in the hook:
 
 ```bash
-paver hooks install --verify
+pave hooks install --verify
 ```
 
 To overwrite existing hooks:
 
 ```bash
-paver hooks install --force
+pave hooks install --force
 ```
 
 **Why hooks help:**
@@ -201,7 +201,7 @@ Hooks provide immediate feedback when editing docs. You'll catch:
 Monitor your documentation health with:
 
 ```bash
-paver check
+pave check
 ```
 
 This shows:
@@ -212,15 +212,15 @@ This shows:
 Check code-to-documentation coverage:
 
 ```bash
-paver coverage
+pave coverage
 ```
 
 This reports which code paths have corresponding documentation and highlights gaps.
 
 **When to disable gradual mode:**
 
-Remove `gradual = true` from `.paver.toml` when:
-- All existing docs pass `paver check`
+Remove `gradual = true` from `.pave.toml` when:
+- All existing docs pass `pave check`
 - CI is stable
 - Team is comfortable with the workflow
 
@@ -242,9 +242,9 @@ READMEs often mix multiple concerns. Split them into PAVED documents:
 Create focused documents:
 
 ```bash
-paver new component my-service
-paver new runbook deploy-my-service
-paver new adr why-we-chose-x
+pave new component my-service
+pave new runbook deploy-my-service
+pave new adr why-we-chose-x
 ```
 
 ### Converting API documentation
@@ -253,7 +253,7 @@ API docs map well to components:
 
 1. Create a component for each service/module:
    ```bash
-   paver new component user-api
+   pave new component user-api
    ```
 
 2. Move endpoint documentation to **Interface** section
@@ -298,7 +298,7 @@ PAVED is flexible. The three document types cover most needs:
 - **Runbooks**: Any procedure someone follows
 - **ADRs**: Any significant decision worth recording
 
-If you have documentation that doesn't fit (e.g., user tutorials, marketing content), you can exclude it from paver validation using `.paver.toml`:
+If you have documentation that doesn't fit (e.g., user tutorials, marketing content), you can exclude it from pave validation using `.pave.toml`:
 
 ```toml
 [mapping]
@@ -307,7 +307,7 @@ exclude = ["docs/tutorials/", "docs/marketing/"]
 
 ### Can we customize required sections?
 
-Yes. In `.paver.toml`, you can relax requirements:
+Yes. In `.pave.toml`, you can relax requirements:
 
 ```toml
 [rules]
@@ -334,7 +334,7 @@ mkdir archive
 mv docs/old-stuff archive/
 ```
 
-The `paver check` command will only validate documents within the configured docs root.
+The `pave check` command will only validate documents within the configured docs root.
 
 ## Next Steps
 

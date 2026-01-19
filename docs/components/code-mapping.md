@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Code mapping links documentation to source code files via the `## Paths` section. When code changes, `paver changed` identifies which docs may need updates. This keeps documentation synchronized with the codebase.
+Code mapping links documentation to source code files via the `## Paths` section. When code changes, `pave changed` identifies which docs may need updates. This keeps documentation synchronized with the codebase.
 
 **Non-goals:**
 - Not automatic doc generation (you still write the docs)
@@ -32,7 +32,7 @@ Patterns support:
 ### CLI Usage
 
 ```bash
-paver changed [options]
+pave changed [options]
 ```
 
 | Option | Description |
@@ -52,11 +52,11 @@ Impacted documentation (2 docs):
   ✓ Auth Service (docs/components/auth-service.md)
       ← src/auth.rs
       ← src/auth/session.rs
-  ✗ CLI Reference (docs/components/paver-cli.md)
+  ✗ CLI Reference (docs/components/pave-cli.md)
       ← src/cli.rs
 
 1 doc needs review:
-  - docs/components/paver-cli.md
+  - docs/components/pave-cli.md
 ```
 
 Legend:
@@ -76,13 +76,13 @@ Legend:
       "was_updated": true
     }
   ],
-  "missing_updates": ["docs/components/paver-cli.md"]
+  "missing_updates": ["docs/components/pave-cli.md"]
 }
 ```
 
 ## Configuration
 
-Code mapping uses the standard `.paver.toml` configuration to locate the docs root. No additional configuration is required.
+Code mapping uses the standard `.pave.toml` configuration to locate the docs root. No additional configuration is required.
 
 The `## Paths` section is parsed from any markdown document in the docs directory. Documents without a Paths section are not tracked for code changes.
 
@@ -91,13 +91,13 @@ The `## Paths` section is parsed from any markdown document in the docs director
 Check that code mapping detects impacted docs:
 
 ```bash
-./target/release/paver changed --base HEAD~1
+./target/release/pave changed --base HEAD~1
 ```
 
 Verify JSON output format works:
 
 ```bash
-./target/release/paver changed --base HEAD~1 --format json | head -1
+./target/release/pave changed --base HEAD~1 --format json | head -1
 ```
 
 ## Examples
@@ -140,7 +140,7 @@ Fail the build if impacted docs weren't updated:
 ```yaml
 # .github/workflows/docs.yml
 - name: Check doc coverage
-  run: paver changed --strict --base origin/main
+  run: pave changed --strict --base origin/main
 ```
 
 This ensures documentation stays current with code changes.
@@ -149,17 +149,17 @@ This ensures documentation stays current with code changes.
 
 Compare against a feature branch:
 ```bash
-paver changed --base feature/new-auth
+pave changed --base feature/new-auth
 ```
 
 Compare against a specific commit:
 ```bash
-paver changed --base abc1234
+pave changed --base abc1234
 ```
 
 Compare against the previous commit:
 ```bash
-paver changed --base HEAD~1
+pave changed --base HEAD~1
 ```
 
 ### JSON Output for Scripting
@@ -167,12 +167,12 @@ paver changed --base HEAD~1
 Process impacted docs programmatically:
 
 ```bash
-paver changed --format json | jq '.missing_updates[]'
+pave changed --format json | jq '.missing_updates[]'
 ```
 
 ## Gotchas
 
-- **Paths are relative to project root**: All patterns are matched from the directory containing `.paver.toml`.
+- **Paths are relative to project root**: All patterns are matched from the directory containing `.pave.toml`.
 - **Glob patterns use standard glob syntax**: `*` matches within a directory, `**` matches across directories.
 - **Documents without Paths sections are skipped**: Only docs with explicit path mappings are tracked.
 - **index.md is always skipped**: The index document is not included in change detection.

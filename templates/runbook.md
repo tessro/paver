@@ -13,7 +13,7 @@
 <!-- How to undo if something goes wrong. -->
 
 ## Verification
-<!-- How to confirm success. Commands in bash blocks are executable via `paver verify`. -->
+<!-- How to confirm success. Commands in bash blocks are executable via `pave verify`. -->
 
 Verify the deployment completed:
 ```bash

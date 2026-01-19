@@ -1,6 +1,6 @@
 //! Build static documentation site from PAVED docs.
 //!
-//! This module implements the `paver build` command which generates a static
+//! This module implements the `pave build` command which generates a static
 //! HTML site from the documentation files.
 
 use anyhow::{Context, Result};
@@ -8,15 +8,15 @@ use pulldown_cmark::{Options, Parser, html};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::config::{CONFIG_FILENAME, PaverConfig};
+use crate::config::{CONFIG_FILENAME, PaveConfig};
 
-/// Arguments for the `paver build` command.
+/// Arguments for the `pave build` command.
 pub struct BuildArgs {
     /// Output directory for the built site.
     pub output: PathBuf,
 }
 
-/// Execute the `paver build` command.
+/// Execute the `pave build` command.
 pub fn execute(args: BuildArgs) -> Result<()> {
     let config = load_config()?;
     let docs_root = &config.docs.root;
@@ -53,7 +53,7 @@ pub fn execute(args: BuildArgs) -> Result<()> {
     // Step 1: Copy site source files (assets, index.html, etc.)
     copy_site_source(&site_source, output_dir)?;
 
-    // Step 2: Copy and process paver docs
+    // Step 2: Copy and process pave docs
     let paved_docs_dest = output_dir.join("paved-docs");
     fs::create_dir_all(&paved_docs_dest)?;
     copy_and_process_docs(docs_root, &paved_docs_dest)?;
@@ -74,8 +74,8 @@ pub fn execute(args: BuildArgs) -> Result<()> {
     Ok(())
 }
 
-/// Load paver configuration from current directory or parents.
-fn load_config() -> Result<PaverConfig> {
+/// Load pave configuration from current directory or parents.
+fn load_config() -> Result<PaveConfig> {
     let cwd = std::env::current_dir().context("failed to get current directory")?;
 
     // Search for config file in current directory and parents
@@ -83,7 +83,7 @@ fn load_config() -> Result<PaverConfig> {
     loop {
         let config_path = search_path.join(CONFIG_FILENAME);
         if config_path.exists() {
-            return PaverConfig::load(&config_path);
+            return PaveConfig::load(&config_path);
         }
 
         match search_path.parent() {
@@ -93,7 +93,7 @@ fn load_config() -> Result<PaverConfig> {
     }
 
     // No config found, use defaults
-    Ok(PaverConfig::default())
+    Ok(PaveConfig::default())
 }
 
 /// Find the site source directory.
@@ -294,7 +294,7 @@ fn process_html_file(
     let title = front_matter
         .get("title")
         .cloned()
-        .unwrap_or_else(|| "paver".to_string());
+        .unwrap_or_else(|| "pave".to_string());
 
     // Apply template (the HTML content is already HTML, not markdown)
     let html = apply_template(template, &html_content, &title, output_root, html_path)?;
@@ -342,7 +342,7 @@ fn convert_md_to_html(
         .get("title")
         .cloned()
         .or_else(|| extract_title(&markdown_content))
-        .unwrap_or_else(|| "paver".to_string());
+        .unwrap_or_else(|| "pave".to_string());
 
     // Apply template
     let html = apply_template(template, &html_content, &title, output_root, md_path)?;
@@ -433,10 +433,10 @@ fn apply_template(
     result = result.replace("{{ content }}", content);
 
     // Handle title with conditional
-    let title_replacement = if title.is_empty() || title == "paver" {
-        "paver".to_string()
+    let title_replacement = if title.is_empty() || title == "pave" {
+        "pave".to_string()
     } else {
-        format!("{} | paver", title)
+        format!("{} | pave", title)
     };
     // Remove Jekyll conditionals and replace with simple title
     result = replace_title_block(&result, &title_replacement);
@@ -476,8 +476,8 @@ fn apply_template(
         &format!("{}/paved-docs/manifesto/", base_path),
     );
     result = result.replace(
-        "{{ '/paved-docs/components/paver-cli/' | relative_url }}",
-        &format!("{}/paved-docs/components/paver-cli/", base_path),
+        "{{ '/paved-docs/components/pave-cli/' | relative_url }}",
+        &format!("{}/paved-docs/components/pave-cli/", base_path),
     );
     result = result.replace(
         "{{ '/paved-docs/components/validation-engine/' | relative_url }}",
@@ -501,7 +501,7 @@ fn apply_template(
     );
 
     // Replace site variables
-    result = result.replace("{{ site.title }}", "paver");
+    result = result.replace("{{ site.title }}", "pave");
     result = result.replace("{{ site.description }}", "PAVED docs for the AI agent era");
 
     // Remove any remaining Jekyll conditionals

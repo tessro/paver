@@ -1,4 +1,4 @@
-//! Implementation of the `paver lint` command for prose quality checks.
+//! Implementation of the `pave lint` command for prose quality checks.
 
 use anyhow::{Context, Result};
 use regex::Regex;
@@ -8,10 +8,10 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 use crate::cli::OutputFormat;
-use crate::config::{CONFIG_FILENAME, LintSection, PaverConfig};
+use crate::config::{CONFIG_FILENAME, LintSection, PaveConfig};
 use crate::parser::{CodeBlockTracker, ParsedDoc};
 
-/// Arguments for the `paver lint` command.
+/// Arguments for the `pave lint` command.
 pub struct LintArgs {
     /// Specific files or directories to lint.
     pub paths: Vec<PathBuf>,
@@ -151,11 +151,11 @@ impl LintResults {
     }
 }
 
-/// Execute the `paver lint` command.
+/// Execute the `pave lint` command.
 pub fn execute(args: LintArgs) -> Result<()> {
     // Find and load config
     let config_path = find_config()?;
-    let config = PaverConfig::load(&config_path)?;
+    let config = PaveConfig::load(&config_path)?;
     let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
     // Determine paths to lint
@@ -214,7 +214,7 @@ pub fn execute(args: LintArgs) -> Result<()> {
     Ok(())
 }
 
-/// Find the .paver.toml config file by walking up from the current directory.
+/// Find the .pave.toml config file by walking up from the current directory.
 fn find_config() -> Result<PathBuf> {
     let current_dir = env::current_dir().context("Failed to get current directory")?;
     let mut dir = current_dir.as_path();
@@ -943,7 +943,7 @@ fn output_text(results: &LintResults, fix_mode: bool) {
             );
         } else if fixable_count > 0 && !fix_mode {
             println!(
-                "Run 'paver lint --fix' to auto-fix {} issue{}.",
+                "Run 'pave lint --fix' to auto-fix {} issue{}.",
                 fixable_count,
                 if fixable_count == 1 { "" } else { "s" }
             );
@@ -978,13 +978,13 @@ mod tests {
 
     fn create_test_config(temp_dir: &TempDir) -> PathBuf {
         let config_content = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "docs"
 "#;
-        let config_path = temp_dir.path().join(".paver.toml");
+        let config_path = temp_dir.path().join(".pave.toml");
         fs::write(&config_path, config_content).unwrap();
         config_path
     }

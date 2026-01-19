@@ -38,17 +38,17 @@ PAVED supports three document types, each with specific sections:
 
 | Command | Description |
 |---------|-------------|
-| `paver init` | Initialize PAVED documentation in a project |
-| `paver new <type> <name>` | Create a new document from template |
-| `paver check [paths]` | Validate documents against PAVED rules |
-| `paver prompt <path>` | Generate context for AI agents |
+| `pave init` | Initialize PAVED documentation in a project |
+| `pave new <type> <name>` | Create a new document from template |
+| `pave check [paths]` | Validate documents against PAVED rules |
+| `pave prompt <path>` | Generate context for AI agents |
 
 ## Configuration
 
-Configuration lives in `.paver.toml` at the project root:
+Configuration lives in `.pave.toml` at the project root:
 
 ```toml
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -74,19 +74,19 @@ require_examples = true
 Validate documents pass PAVED requirements:
 
 ```bash
-./target/release/paver check
+./target/release/pave check
 ```
 
 Check a specific file:
 
 ```bash
-./target/release/paver check docs/manifesto.md
+./target/release/pave check docs/manifesto.md
 ```
 
 Check with strict mode (warnings become errors):
 
 ```bash
-./target/release/paver check --strict
+./target/release/pave check --strict
 ```
 
 Common validation errors:
@@ -100,7 +100,7 @@ docs/example.md:1: error: Missing required section 'Verification'
 ### Creating a new component doc
 
 ```bash
-paver new component auth-service
+pave new component auth-service
 ```
 
 Creates `docs/auth-service.md`:
@@ -175,7 +175,7 @@ BackgroundJob.perform_later(user_id: 123)
 ### Failure case: Document too long
 
 ```bash
-$ paver check docs/monolith.md
+$ pave check docs/monolith.md
 docs/monolith.md:350: warning: Document exceeds 300 line limit (350 lines)
   hint: Consider splitting into smaller, focused documents
 

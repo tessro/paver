@@ -5,11 +5,11 @@ title: CI/CD Integration
 
 # CI/CD Integration
 
-Running paver in your CI/CD pipeline ensures documentation stays valid and verification commands continue to pass.
+Running pave in your CI/CD pipeline ensures documentation stays valid and verification commands continue to pass.
 
 ## Overview
 
-### Why Run Paver in CI?
+### Why Run Pave in CI?
 
 - **Catch drift early** - Verification commands fail when docs diverge from reality
 - **Enforce quality** - Validate structure, required sections, and line limits
@@ -20,8 +20,8 @@ Running paver in your CI/CD pipeline ensures documentation stays valid and verif
 
 | Command | Purpose | Speed | When to Run |
 |---------|---------|-------|-------------|
-| `paver check` | Validates structure and rules | Fast (seconds) | Every PR |
-| `paver verify` | Runs verification commands | Slower (varies) | PRs touching code or docs |
+| `pave check` | Validates structure and rules | Fast (seconds) | Every PR |
+| `pave verify` | Runs verification commands | Slower (varies) | PRs touching code or docs |
 
 Run `check` on every PR. Run `verify` when code or docs change.
 
@@ -38,7 +38,7 @@ name: Documentation
 on: [pull_request]
 
 jobs:
-  paver:
+  pave:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,11 +49,11 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Build paver
+      - name: Build pave
         run: cargo build --release
 
       - name: Check documentation
-        run: ./target/release/paver check --format github
+        run: ./target/release/pave check --format github
 ```
 
 The `--format github` flag produces annotations that appear inline on PR diffs.
@@ -71,12 +71,12 @@ on:
     paths:
       - 'docs/**'
       - 'src/**'
-      - '.paver.toml'
+      - '.pave.toml'
   pull_request:
     paths:
       - 'docs/**'
       - 'src/**'
-      - '.paver.toml'
+      - '.pave.toml'
 
 jobs:
   validate:
@@ -92,14 +92,14 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Build paver
+      - name: Build pave
         run: cargo build --release
 
       - name: Check documentation
-        run: ./target/release/paver check --strict --format github
+        run: ./target/release/pave check --strict --format github
 
       - name: Run verification commands
-        run: ./target/release/paver verify --keep-going --format github
+        run: ./target/release/pave verify --keep-going --format github
 ```
 
 **Flags explained:**
@@ -114,7 +114,7 @@ Check only documentation affected by the current PR:
 
 ```yaml
 - name: Check changed docs only
-  run: ./target/release/paver check --changed --base origin/main --format github
+  run: ./target/release/pave check --changed --base origin/main --format github
 ```
 
 The `--changed` flag compares against a base ref (default: `origin/main`) and only validates modified documents. This speeds up large documentation sets.
@@ -123,7 +123,7 @@ The `--changed` flag compares against a base ref (default: `origin/main`) and on
 
 ### Gradual Mode Workflow
 
-For teams adopting paver incrementally, run both gradual and strict checks:
+For teams adopting pave incrementally, run both gradual and strict checks:
 
 ```yaml
 jobs:
@@ -140,16 +140,16 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Build paver
+      - name: Build pave
         run: cargo build --release
 
       # Always runs - reports warnings but doesn't fail
       - name: Check documentation (gradual)
-        run: ./target/release/paver check --gradual --format github
+        run: ./target/release/pave check --gradual --format github
 
       # Fails if new docs don't meet standards
       - name: Check new documentation (strict)
-        run: ./target/release/paver check --changed --strict --format github
+        run: ./target/release/pave check --changed --strict --format github
         if: github.event_name == 'pull_request'
 ```
 
@@ -172,13 +172,13 @@ documentation:
   image: rust:latest
   script:
     - cargo build --release
-    - ./target/release/paver check
-    - ./target/release/paver verify --keep-going
+    - ./target/release/pave check
+    - ./target/release/pave verify --keep-going
   rules:
     - changes:
         - docs/**/*
         - src/**/*
-        - .paver.toml
+        - .pave.toml
 ```
 
 ### With Artifacts
@@ -191,8 +191,8 @@ documentation:
   image: rust:latest
   script:
     - cargo build --release
-    - ./target/release/paver check --format json > check-report.json
-    - ./target/release/paver verify --keep-going --report verify-report.json
+    - ./target/release/pave check --format json > check-report.json
+    - ./target/release/pave verify --keep-going --report verify-report.json
   artifacts:
     when: always
     paths:
@@ -209,7 +209,7 @@ documentation:
 
 ### Environment Variables
 
-Paver respects these standard environment variables:
+Pave respects these standard environment variables:
 
 | Variable | Description |
 |----------|-------------|
@@ -227,7 +227,7 @@ Paver respects these standard environment variables:
 Use exit codes for conditional steps:
 
 ```bash
-paver check || echo "Documentation issues found"
+pave check || echo "Documentation issues found"
 ```
 
 ### JSON Output for Custom Processing
@@ -236,10 +236,10 @@ Generate machine-readable output for custom integrations:
 
 ```bash
 # Check output
-paver check --format json > check-results.json
+pave check --format json > check-results.json
 
 # Verify output with report
-paver verify --format json --report verify-results.json
+pave verify --format json --report verify-results.json
 ```
 
 **Check JSON structure:**
@@ -289,7 +289,7 @@ paver verify --format json --report verify-results.json
 
 ### When to Check vs Verify
 
-| Scenario | `paver check` | `paver verify` |
+| Scenario | `pave check` | `pave verify` |
 |----------|---------------|----------------|
 | Quick PR feedback | Yes | No |
 | Docs-only changes | Yes | Yes |
@@ -303,19 +303,19 @@ Use `--keep-going` with verify to collect all failures:
 
 ```bash
 # Fails fast (default)
-paver verify
+pave verify
 
 # Reports all failures
-paver verify --keep-going
+pave verify --keep-going
 ```
 
 For gradual adoption, use `--gradual` to report issues without failing:
 
 ```bash
-paver check --gradual  # Exits 0 even with issues
+pave check --gradual  # Exits 0 even with issues
 ```
 
-### Caching the Paver Binary
+### Caching the Pave Binary
 
 Speed up CI by caching the compiled binary:
 
@@ -330,7 +330,7 @@ Speed up CI by caching the compiled binary:
 
 ```bash
 # Cache key based on Cargo.lock
-CACHE_KEY="paver-$(sha256sum Cargo.lock | cut -d' ' -f1)"
+CACHE_KEY="pave-$(sha256sum Cargo.lock | cut -d' ' -f1)"
 ```
 
 ### Running on Documentation-Only Changes
@@ -344,7 +344,7 @@ on:
   pull_request:
     paths:
       - 'docs/**'
-      - '.paver.toml'
+      - '.pave.toml'
       - 'templates/**'
 ```
 
@@ -354,7 +354,7 @@ on:
 rules:
   - changes:
       - docs/**/*
-      - .paver.toml
+      - .pave.toml
 ```
 
 ## Troubleshooting
@@ -363,11 +363,11 @@ rules:
 
 **Common causes:**
 
-1. **Different working directory** - Paver looks for `.paver.toml` from the current directory
+1. **Different working directory** - Pave looks for `.pave.toml` from the current directory
    ```bash
    # Ensure you're in the repo root
    cd $GITHUB_WORKSPACE
-   paver check
+   pave check
    ```
 
 2. **Missing git history** - The `--changed` flag needs commit history
@@ -380,7 +380,7 @@ rules:
 3. **Gradual mode differences** - Local config may have `gradual = true`
    ```bash
    # Force strict mode in CI
-   paver check --strict
+   pave check --strict
    ```
 
 ### Verify Commands Fail in CI
@@ -393,7 +393,7 @@ rules:
      run: apt-get install -y curl jq
 
    - name: Run verify
-     run: paver verify
+     run: pave verify
    ```
 
 2. **Services not running** - Start required services first
@@ -407,13 +407,13 @@ rules:
 
 3. **Timeout issues** - Increase timeout for slow commands
    ```bash
-   paver verify --timeout 60  # 60 seconds per command
+   pave verify --timeout 60  # 60 seconds per command
    ```
 
 4. **Environment differences** - Set required environment variables
    ```yaml
    - name: Run verify
-     run: paver verify
+     run: pave verify
      env:
        DATABASE_URL: postgres://localhost/test
    ```
@@ -424,7 +424,7 @@ For large documentation sets:
 
 1. **Use `--changed` flag** - Only check modified docs
    ```bash
-   paver check --changed --base origin/main
+   pave check --changed --base origin/main
    ```
 
 2. **Parallelize jobs** - Split check and verify
@@ -433,12 +433,12 @@ For large documentation sets:
      check:
        runs-on: ubuntu-latest
        steps:
-         - run: paver check
+         - run: pave check
 
      verify:
        runs-on: ubuntu-latest
        steps:
-         - run: paver verify
+         - run: pave verify
    ```
 
 3. **Skip verify on docs-only changes** - Use path filters to skip verify when only docs change
@@ -455,16 +455,16 @@ Confirm CI integration works:
 
 ```bash
 # Simulate GitHub Actions output
-paver check --format github
+pave check --format github
 
 # Test strict mode behavior
-paver check --strict
+pave check --strict
 
 # Verify JSON output is valid
-paver check --format json | jq .
+pave check --format json | jq .
 
 # Test verify with timeout
-paver verify --timeout 10 --keep-going
+pave verify --timeout 10 --keep-going
 ```
 
 ## Next Steps

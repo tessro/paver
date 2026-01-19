@@ -760,7 +760,7 @@ hello
 ```bash
 cargo test
 ```
-<!-- paver:expect:regex -->
+<!-- pave:expect:regex -->
 ```
 test result: ok\. \d+ passed
 ```
@@ -784,7 +784,7 @@ test result: ok\. \d+ passed
     #[test]
     fn test_extract_verification_spec_with_working_dir_from_frontmatter() {
         let content = r#"---
-paver:
+pave:
   working_dir: packages/api
 ---
 # API Tests
@@ -811,7 +811,7 @@ npm test
         let content = r#"# API Tests
 
 ## Verification
-<!-- paver:working_dir src/tests -->
+<!-- pave:working_dir src/tests -->
 ```bash
 cargo test
 ```
@@ -831,13 +831,13 @@ cargo test
     #[test]
     fn test_extract_verification_spec_inline_overrides_frontmatter() {
         let content = r#"---
-paver:
+pave:
   working_dir: default/path
 ---
 # API Tests
 
 ## Verification
-<!-- paver:working_dir override/path -->
+<!-- pave:working_dir override/path -->
 ```bash
 npm test
 ```
@@ -860,8 +860,8 @@ npm test
         let content = r#"# API Tests
 
 ## Verification
-<!-- paver:env TEST_DB=sqlite -->
-<!-- paver:env DEBUG=true -->
+<!-- pave:env TEST_DB=sqlite -->
+<!-- pave:env DEBUG=true -->
 ```bash
 cargo test
 ```
@@ -906,7 +906,7 @@ cargo test
     #[test]
     fn test_frontmatter_working_dir_applies_to_all_blocks() {
         let content = r#"---
-paver:
+pave:
   working_dir: packages/shared
 ---
 # Shared Tests

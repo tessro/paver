@@ -1,4 +1,4 @@
-//! Implementation of the `paver coverage` command for analyzing code-to-doc coverage.
+//! Implementation of the `pave coverage` command for analyzing code-to-doc coverage.
 //!
 //! This module analyzes which code files are covered by documentation patterns
 //! defined in the `## Paths` sections of PAVED documents.
@@ -11,10 +11,10 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 use crate::cli::CoverageOutputFormat;
-use crate::config::{CONFIG_FILENAME, PaverConfig};
+use crate::config::{CONFIG_FILENAME, PaveConfig};
 use crate::parser::CodeBlockTracker;
 
-/// Arguments for the `paver coverage` command.
+/// Arguments for the `pave coverage` command.
 pub struct CoverageArgs {
     /// Path to analyze (defaults to project root).
     pub path: Option<PathBuf>,
@@ -93,11 +93,11 @@ struct DocMapping {
     patterns: Vec<String>,
 }
 
-/// Execute the `paver coverage` command.
+/// Execute the `pave coverage` command.
 pub fn execute(args: CoverageArgs) -> Result<()> {
     // Find and load config
     let config_path = find_config()?;
-    let config = PaverConfig::load(&config_path)?;
+    let config = PaveConfig::load(&config_path)?;
     let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
     let docs_root = config_dir.join(&config.docs.root);
 
@@ -195,7 +195,7 @@ pub fn execute(args: CoverageArgs) -> Result<()> {
     Ok(())
 }
 
-/// Find the .paver.toml config file by walking up from the current directory.
+/// Find the .pave.toml config file by walking up from the current directory.
 fn find_config() -> Result<PathBuf> {
     let current_dir = env::current_dir().context("Failed to get current directory")?;
     let mut dir = current_dir.as_path();

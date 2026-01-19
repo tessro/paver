@@ -1,26 +1,26 @@
 use anyhow::Result;
 use clap::Parser;
-use paver::cli::{
+use pave::cli::{
     AdoptOutputFormat, Cli, Command, ConfigCommand, DocType, HooksCommand, MigrateOutputFormat,
     PromptOutputFormat,
 };
-use paver::commands::adopt::{self, AdoptArgs};
-use paver::commands::build;
-use paver::commands::changed::{self, ChangedArgs};
-use paver::commands::check::{self, CheckArgs};
-use paver::commands::config;
-use paver::commands::coverage::{self, CoverageArgs};
-use paver::commands::doctor::{self, DoctorArgs};
-use paver::commands::hooks;
-use paver::commands::index;
-use paver::commands::init;
-use paver::commands::lint::{self, LintArgs};
-use paver::commands::migrate::{self, MigrateArgs};
-use paver::commands::new::{self, NewArgs};
-use paver::commands::prompt::{OutputFormat, PromptOptions, generate_prompt};
-use paver::commands::status::{self, StatusArgs};
-use paver::commands::verify::{self, VerifyArgs};
-use paver::templates::TemplateType;
+use pave::commands::adopt::{self, AdoptArgs};
+use pave::commands::build;
+use pave::commands::changed::{self, ChangedArgs};
+use pave::commands::check::{self, CheckArgs};
+use pave::commands::config;
+use pave::commands::coverage::{self, CoverageArgs};
+use pave::commands::doctor::{self, DoctorArgs};
+use pave::commands::hooks;
+use pave::commands::index;
+use pave::commands::init;
+use pave::commands::lint::{self, LintArgs};
+use pave::commands::migrate::{self, MigrateArgs};
+use pave::commands::new::{self, NewArgs};
+use pave::commands::prompt::{OutputFormat, PromptOptions, generate_prompt};
+use pave::commands::status::{self, StatusArgs};
+use pave::commands::verify::{self, VerifyArgs};
+use pave::templates::TemplateType;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -114,7 +114,7 @@ fn main() -> Result<()> {
             } => {
                 // Use --verify flag if specified, otherwise check config
                 let run_verify = verify
-                    || paver::config::PaverConfig::load(paver::config::CONFIG_FILENAME)
+                    || pave::config::PaveConfig::load(pave::config::CONFIG_FILENAME)
                         .map(|c| c.hooks.run_verify)
                         .unwrap_or(false);
                 hooks::install(hook, force, run_verify)?;

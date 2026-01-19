@@ -28,7 +28,7 @@ Adopt the PAVED framework for all project documentation:
 Additionally:
 
 - Use atomic "leaf docs" (one concept per document) with index routing
-- Enforce validation rules via `paver check`
+- Enforce validation rules via `pave check`
 - Require Verification and Examples sections in all documents
 - Limit documents to 300 lines (split if larger)
 
@@ -46,7 +46,7 @@ Additionally:
 
 - Higher upfront effort to create documentation
 - All existing docs must be migrated to PAVED format
-- Requires tooling (`paver`) to enforce rules
+- Requires tooling (`pave`) to enforce rules
 - Some docs may feel overly structured for simple concepts
 
 **Neutral:**

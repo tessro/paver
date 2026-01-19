@@ -1,6 +1,6 @@
-//! Configuration file handling for paver.
+//! Configuration file handling for pave.
 //!
-//! This module defines the `.paver.toml` configuration schema and provides
+//! This module defines the `.pave.toml` configuration schema and provides
 //! functions for loading, validating, and saving configuration files.
 
 use anyhow::{Context, Result};
@@ -8,13 +8,13 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 /// The default configuration filename.
-pub const CONFIG_FILENAME: &str = ".paver.toml";
+pub const CONFIG_FILENAME: &str = ".pave.toml";
 
-/// Root configuration structure for a paver project.
+/// Root configuration structure for a pave project.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct PaverConfig {
-    /// Paver tool settings.
-    pub paver: PaverSection,
+pub struct PaveConfig {
+    /// Pave tool settings.
+    pub pave: PaveSection,
     /// Documentation location settings.
     pub docs: DocsSection,
     /// Validation rules.
@@ -34,9 +34,9 @@ pub struct PaverConfig {
     pub lint: LintSection,
 }
 
-/// Paver tool metadata section.
+/// Pave tool metadata section.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PaverSection {
+pub struct PaveSection {
     /// Configuration schema version.
     pub version: String,
 }
@@ -136,7 +136,7 @@ pub struct MappingSection {
 /// Git hooks configuration section.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct HooksSection {
-    /// Run paver verify in hooks (default: false).
+    /// Run pave verify in hooks (default: false).
     #[serde(default)]
     pub run_verify: bool,
 }
@@ -181,7 +181,7 @@ fn default_true() -> bool {
     true
 }
 
-impl Default for PaverSection {
+impl Default for PaveSection {
     fn default() -> Self {
         Self {
             version: "0.1".to_string(),
@@ -216,7 +216,7 @@ impl Default for RulesSection {
     }
 }
 
-impl PaverConfig {
+impl PaveConfig {
     /// Load configuration from a file path.
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
@@ -227,7 +227,7 @@ impl PaverConfig {
 
     /// Parse configuration from a TOML string.
     pub fn parse(content: &str) -> Result<Self> {
-        let config: PaverConfig = toml::from_str(content).context("failed to parse config file")?;
+        let config: PaveConfig = toml::from_str(content).context("failed to parse config file")?;
         config.validate()?;
         Ok(config)
     }
@@ -243,8 +243,8 @@ impl PaverConfig {
 
     /// Validate the configuration values.
     pub fn validate(&self) -> Result<()> {
-        if self.paver.version.is_empty() {
-            anyhow::bail!("paver.version cannot be empty");
+        if self.pave.version.is_empty() {
+            anyhow::bail!("pave.version cannot be empty");
         }
 
         if self.docs.root.as_os_str().is_empty() {
@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn parse_valid_config() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -283,8 +283,8 @@ component = "component.md"
 runbook = "runbook.md"
 adr = "adr.md"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
-        assert_eq!(config.paver.version, "0.1");
+        let config = PaveConfig::parse(toml).unwrap();
+        assert_eq!(config.pave.version, "0.1");
         assert_eq!(config.docs.root, PathBuf::from("docs"));
         assert_eq!(config.docs.templates, Some(PathBuf::from("docs/templates")));
         assert_eq!(config.rules.max_lines, 300);
@@ -298,14 +298,14 @@ adr = "adr.md"
     #[test]
     fn parse_config_with_missing_optional_fields() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "documentation"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
-        assert_eq!(config.paver.version, "0.1");
+        let config = PaveConfig::parse(toml).unwrap();
+        assert_eq!(config.pave.version, "0.1");
         assert_eq!(config.docs.root, PathBuf::from("documentation"));
         assert_eq!(config.docs.templates, None);
         // Default values should be applied
@@ -318,13 +318,13 @@ root = "documentation"
     #[test]
     fn reject_config_with_empty_version() {
         let toml = r#"
-[paver]
+[pave]
 version = ""
 
 [docs]
 root = "docs"
 "#;
-        let result = PaverConfig::parse(toml);
+        let result = PaveConfig::parse(toml);
         assert!(result.is_err());
         assert!(
             result
@@ -337,7 +337,7 @@ root = "docs"
     #[test]
     fn reject_config_with_zero_max_lines() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -346,7 +346,7 @@ root = "docs"
 [rules]
 max_lines = 0
 "#;
-        let result = PaverConfig::parse(toml);
+        let result = PaveConfig::parse(toml);
         assert!(result.is_err());
         assert!(
             result
@@ -358,9 +358,9 @@ max_lines = 0
 
     #[test]
     fn default_config_is_valid() {
-        let config = PaverConfig::default();
+        let config = PaveConfig::default();
         assert!(config.validate().is_ok());
-        assert_eq!(config.paver.version, "0.1");
+        assert_eq!(config.pave.version, "0.1");
         assert_eq!(config.docs.root, PathBuf::from("docs"));
         assert_eq!(config.rules.max_lines, 300);
         assert!(config.rules.require_verification);
@@ -369,22 +369,22 @@ max_lines = 0
 
     #[test]
     fn config_roundtrip() {
-        let config = PaverConfig::default();
+        let config = PaveConfig::default();
         let serialized = toml::to_string_pretty(&config).unwrap();
-        let deserialized = PaverConfig::parse(&serialized).unwrap();
+        let deserialized = PaveConfig::parse(&serialized).unwrap();
         assert_eq!(config, deserialized);
     }
 
     #[test]
     fn reject_config_with_empty_docs_root() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = ""
 "#;
-        let result = PaverConfig::parse(toml);
+        let result = PaveConfig::parse(toml);
         assert!(result.is_err());
         assert!(
             result
@@ -397,7 +397,7 @@ root = ""
     #[test]
     fn parse_config_with_custom_rules() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -408,7 +408,7 @@ max_lines = 500
 require_verification = false
 require_examples = false
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert_eq!(config.rules.max_lines, 500);
         assert!(!config.rules.require_verification);
         assert!(!config.rules.require_examples);
@@ -417,7 +417,7 @@ require_examples = false
     #[test]
     fn parse_config_with_mapping_section() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -426,7 +426,7 @@ root = "docs"
 [mapping]
 exclude = ["target/", "node_modules/", "*.generated.rs"]
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert_eq!(config.mapping.exclude.len(), 3);
         assert_eq!(config.mapping.exclude[0], "target/");
         assert_eq!(config.mapping.exclude[1], "node_modules/");
@@ -436,29 +436,29 @@ exclude = ["target/", "node_modules/", "*.generated.rs"]
     #[test]
     fn parse_config_without_mapping_uses_default() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "docs"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(config.mapping.exclude.is_empty());
     }
 
     #[test]
     fn config_roundtrip_with_mapping() {
-        let mut config = PaverConfig::default();
+        let mut config = PaveConfig::default();
         config.mapping.exclude = vec!["target/".to_string(), "*.tmp".to_string()];
         let serialized = toml::to_string_pretty(&config).unwrap();
-        let deserialized = PaverConfig::parse(&serialized).unwrap();
+        let deserialized = PaveConfig::parse(&serialized).unwrap();
         assert_eq!(config, deserialized);
     }
 
     #[test]
     fn parse_config_with_hooks_section() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -467,36 +467,36 @@ root = "docs"
 [hooks]
 run_verify = true
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(config.hooks.run_verify);
     }
 
     #[test]
     fn parse_config_without_hooks_uses_default() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "docs"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(!config.hooks.run_verify);
     }
 
     #[test]
     fn config_roundtrip_with_hooks() {
-        let mut config = PaverConfig::default();
+        let mut config = PaveConfig::default();
         config.hooks.run_verify = true;
         let serialized = toml::to_string_pretty(&config).unwrap();
-        let deserialized = PaverConfig::parse(&serialized).unwrap();
+        let deserialized = PaveConfig::parse(&serialized).unwrap();
         assert_eq!(config, deserialized);
     }
 
     #[test]
     fn parse_config_with_strict_output_matching() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -505,27 +505,27 @@ root = "docs"
 [rules]
 strict_output_matching = true
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(config.rules.strict_output_matching);
     }
 
     #[test]
     fn default_strict_output_matching_is_false() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "docs"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(!config.rules.strict_output_matching);
     }
 
     #[test]
     fn parse_config_with_type_specific_rules() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -536,7 +536,7 @@ runbooks = true
 adrs = true
 components = true
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(config.rules.type_specific.runbooks);
         assert!(config.rules.type_specific.adrs);
         assert!(config.rules.type_specific.components);
@@ -545,13 +545,13 @@ components = true
     #[test]
     fn default_type_specific_rules_are_disabled() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "docs"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(!config.rules.type_specific.runbooks);
         assert!(!config.rules.type_specific.adrs);
         assert!(!config.rules.type_specific.components);
@@ -559,18 +559,18 @@ root = "docs"
 
     #[test]
     fn config_roundtrip_with_type_specific_rules() {
-        let mut config = PaverConfig::default();
+        let mut config = PaveConfig::default();
         config.rules.type_specific.runbooks = true;
         config.rules.type_specific.adrs = true;
         let serialized = toml::to_string_pretty(&config).unwrap();
-        let deserialized = PaverConfig::parse(&serialized).unwrap();
+        let deserialized = PaveConfig::parse(&serialized).unwrap();
         assert_eq!(config, deserialized);
     }
 
     #[test]
     fn parse_config_with_skip_output_matching() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -579,27 +579,27 @@ root = "docs"
 [rules]
 skip_output_matching = true
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(config.rules.skip_output_matching);
     }
 
     #[test]
     fn default_skip_output_matching_is_false() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "docs"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(!config.rules.skip_output_matching);
     }
 
     #[test]
     fn parse_config_with_gradual_mode() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -608,27 +608,27 @@ root = "docs"
 [rules]
 gradual = true
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(config.rules.gradual);
     }
 
     #[test]
     fn default_gradual_is_false() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "docs"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(!config.rules.gradual);
     }
 
     #[test]
     fn parse_config_with_gradual_until() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -638,7 +638,7 @@ root = "docs"
 gradual = true
 gradual_until = "2024-06-01"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert!(config.rules.gradual);
         assert_eq!(config.rules.gradual_until, Some("2024-06-01".to_string()));
     }
@@ -646,23 +646,23 @@ gradual_until = "2024-06-01"
     #[test]
     fn default_gradual_until_is_none() {
         let toml = r#"
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
 root = "docs"
 "#;
-        let config = PaverConfig::parse(toml).unwrap();
+        let config = PaveConfig::parse(toml).unwrap();
         assert_eq!(config.rules.gradual_until, None);
     }
 
     #[test]
     fn config_roundtrip_with_gradual() {
-        let mut config = PaverConfig::default();
+        let mut config = PaveConfig::default();
         config.rules.gradual = true;
         config.rules.gradual_until = Some("2024-12-31".to_string());
         let serialized = toml::to_string_pretty(&config).unwrap();
-        let deserialized = PaverConfig::parse(&serialized).unwrap();
+        let deserialized = PaveConfig::parse(&serialized).unwrap();
         assert_eq!(config, deserialized);
     }
 }

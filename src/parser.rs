@@ -7,9 +7,9 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-/// Paver-specific frontmatter configuration.
+/// Pave-specific frontmatter configuration.
 #[derive(Debug, Clone, Deserialize, PartialEq, Default)]
-pub struct PaverFrontmatter {
+pub struct PaveFrontmatter {
     /// Code paths that this document covers.
     #[serde(default)]
     pub paths: Vec<String>,
@@ -21,9 +21,9 @@ pub struct PaverFrontmatter {
 /// YAML frontmatter wrapper.
 #[derive(Debug, Clone, Deserialize, PartialEq, Default)]
 struct FrontmatterWrapper {
-    /// Paver-specific configuration.
+    /// Pave-specific configuration.
     #[serde(default)]
-    paver: Option<PaverFrontmatter>,
+    pave: Option<PaveFrontmatter>,
 }
 
 /// A parsed PAVED document with extracted structure.
@@ -37,8 +37,8 @@ pub struct ParsedDoc {
     pub sections: Vec<Section>,
     /// Total number of lines in the document.
     pub line_count: usize,
-    /// Paver-specific frontmatter configuration.
-    pub frontmatter: Option<PaverFrontmatter>,
+    /// Pave-specific frontmatter configuration.
+    pub frontmatter: Option<PaveFrontmatter>,
 }
 
 /// Strategy for matching expected output.
@@ -101,7 +101,7 @@ impl Section {
     /// Returns only the code blocks that are marked as executable.
     ///
     /// Executable blocks are those with shell language tags (bash, sh, shell, zsh),
-    /// content with shell prompts ($ or >), or preceded by a `<!-- paver:run -->` marker.
+    /// content with shell prompts ($ or >), or preceded by a `<!-- pave:run -->` marker.
     pub fn executable_commands(&self) -> Vec<&CodeBlock> {
         self.code_blocks
             .iter()
@@ -236,7 +236,7 @@ impl ParsedDoc {
     /// - Lines starting with common commands (make, npm, cargo, etc.)
     fn detect_commands(lines: &[&str]) -> bool {
         const COMMAND_PREFIXES: &[&str] = &[
-            "$ ", "make ", "npm ", "cargo ", "paver ", "git ", "docker ", "kubectl ",
+            "$ ", "make ", "npm ", "cargo ", "pave ", "git ", "docker ", "kubectl ",
         ];
 
         for line in lines {
@@ -256,7 +256,7 @@ impl ParsedDoc {
     /// - Language tag (if present after opening ```)
     /// - Content between the fences
     /// - Line number of the opening fence
-    /// - Whether the block is executable (shell language, prompts, or paver:run marker)
+    /// - Whether the block is executable (shell language, prompts, or pave:run marker)
     /// - Expected output (inline or from explicit blocks)
     ///
     /// The `base_line` parameter is the 1-indexed line number of the first line in `lines`.
@@ -276,19 +276,19 @@ impl ParsedDoc {
             let trimmed = line.trim();
 
             if !in_code_block {
-                // Check for paver:run marker before the code block
-                if Self::has_paver_run_marker(trimmed) {
+                // Check for pave:run marker before the code block
+                if Self::has_pave_run_marker(trimmed) {
                     has_run_marker = true;
                 }
-                // Check for paver:expect marker before a code block
+                // Check for pave:expect marker before a code block
                 else if let Some(strategy) = Self::parse_expect_marker(trimmed) {
                     pending_expect_marker = Some(strategy);
                 }
-                // Check for paver:working_dir marker
+                // Check for pave:working_dir marker
                 else if let Some(dir) = Self::parse_working_dir_marker(trimmed) {
                     pending_working_dir = Some(dir);
                 }
-                // Check for paver:env marker
+                // Check for pave:env marker
                 else if let Some(env_var) = Self::parse_env_marker(trimmed) {
                     pending_env_vars.push(env_var);
                 }
@@ -406,7 +406,7 @@ impl ParsedDoc {
     /// A code block is considered executable if:
     /// 1. Language tag is a shell language: `bash`, `sh`, `shell`, `zsh`
     /// 2. Content contains lines starting with `$ ` or `> ` (shell prompts)
-    /// 3. The block is preceded by a `<!-- paver:run -->` HTML comment marker
+    /// 3. The block is preceded by a `<!-- pave:run -->` HTML comment marker
     fn is_block_executable(language: &Option<String>, content: &str, has_run_marker: bool) -> bool {
         // Check explicit marker first
         if has_run_marker {
@@ -428,37 +428,37 @@ impl ParsedDoc {
         })
     }
 
-    /// Check if a line contains the paver:run marker.
-    fn has_paver_run_marker(line: &str) -> bool {
+    /// Check if a line contains the pave:run marker.
+    fn has_pave_run_marker(line: &str) -> bool {
         let trimmed = line.trim();
-        trimmed.contains("<!-- paver:run -->") || trimmed.contains("<!--paver:run-->")
+        trimmed.contains("<!-- pave:run -->") || trimmed.contains("<!--pave:run-->")
     }
 
-    /// Parse a paver:expect marker and return the matching strategy.
+    /// Parse a pave:expect marker and return the matching strategy.
     ///
     /// Supports:
-    /// - `<!-- paver:expect -->` or `<!-- paver:expect:contains -->` - contains matching (default)
-    /// - `<!-- paver:expect:regex -->` - regex matching
-    /// - `<!-- paver:expect:exact -->` - exact matching
+    /// - `<!-- pave:expect -->` or `<!-- pave:expect:contains -->` - contains matching (default)
+    /// - `<!-- pave:expect:regex -->` - regex matching
+    /// - `<!-- pave:expect:exact -->` - exact matching
     fn parse_expect_marker(line: &str) -> Option<ExpectMatchStrategy> {
         let trimmed = line.trim();
 
         // Check for markers with and without spaces
         let patterns = [
             (
-                "<!-- paver:expect:contains -->",
+                "<!-- pave:expect:contains -->",
                 ExpectMatchStrategy::Contains,
             ),
             (
-                "<!--paver:expect:contains-->",
+                "<!--pave:expect:contains-->",
                 ExpectMatchStrategy::Contains,
             ),
-            ("<!-- paver:expect:regex -->", ExpectMatchStrategy::Regex),
-            ("<!--paver:expect:regex-->", ExpectMatchStrategy::Regex),
-            ("<!-- paver:expect:exact -->", ExpectMatchStrategy::Exact),
-            ("<!--paver:expect:exact-->", ExpectMatchStrategy::Exact),
-            ("<!-- paver:expect -->", ExpectMatchStrategy::Contains),
-            ("<!--paver:expect-->", ExpectMatchStrategy::Contains),
+            ("<!-- pave:expect:regex -->", ExpectMatchStrategy::Regex),
+            ("<!--pave:expect:regex-->", ExpectMatchStrategy::Regex),
+            ("<!-- pave:expect:exact -->", ExpectMatchStrategy::Exact),
+            ("<!--pave:expect:exact-->", ExpectMatchStrategy::Exact),
+            ("<!-- pave:expect -->", ExpectMatchStrategy::Contains),
+            ("<!--pave:expect-->", ExpectMatchStrategy::Contains),
         ];
 
         for (pattern, strategy) in patterns {
@@ -470,16 +470,16 @@ impl ParsedDoc {
         None
     }
 
-    /// Parse a paver:working_dir marker and return the directory path.
+    /// Parse a pave:working_dir marker and return the directory path.
     ///
     /// Supports:
-    /// - `<!-- paver:working_dir path/to/dir -->`
-    /// - `<!--paver:working_dir path/to/dir-->`
+    /// - `<!-- pave:working_dir path/to/dir -->`
+    /// - `<!--pave:working_dir path/to/dir-->`
     fn parse_working_dir_marker(line: &str) -> Option<String> {
         let trimmed = line.trim();
 
         // Try with spaces first
-        if let Some(rest) = trimmed.strip_prefix("<!-- paver:working_dir ")
+        if let Some(rest) = trimmed.strip_prefix("<!-- pave:working_dir ")
             && let Some(dir) = rest.strip_suffix(" -->")
         {
             let dir = dir.trim();
@@ -489,7 +489,7 @@ impl ParsedDoc {
         }
 
         // Try without spaces
-        if let Some(rest) = trimmed.strip_prefix("<!--paver:working_dir ")
+        if let Some(rest) = trimmed.strip_prefix("<!--pave:working_dir ")
             && let Some(dir) = rest.strip_suffix("-->")
         {
             let dir = dir.trim();
@@ -501,17 +501,17 @@ impl ParsedDoc {
         None
     }
 
-    /// Parse a paver:env marker and return the environment variable (key, value).
+    /// Parse a pave:env marker and return the environment variable (key, value).
     ///
     /// Supports:
-    /// - `<!-- paver:env KEY=VALUE -->`
-    /// - `<!--paver:env KEY=VALUE-->`
+    /// - `<!-- pave:env KEY=VALUE -->`
+    /// - `<!--pave:env KEY=VALUE-->`
     fn parse_env_marker(line: &str) -> Option<(String, String)> {
         let trimmed = line.trim();
 
-        let env_str = if let Some(rest) = trimmed.strip_prefix("<!-- paver:env ") {
+        let env_str = if let Some(rest) = trimmed.strip_prefix("<!-- pave:env ") {
             rest.strip_suffix(" -->")
-        } else if let Some(rest) = trimmed.strip_prefix("<!--paver:env ") {
+        } else if let Some(rest) = trimmed.strip_prefix("<!--pave:env ") {
             rest.strip_suffix("-->")
         } else {
             None
@@ -535,11 +535,11 @@ impl ParsedDoc {
     ///
     /// In a code block like:
     /// ```bash
-    /// $ paver check
+    /// $ pave check
     /// Checked 5 documents: all checks passed
     /// ```
     ///
-    /// The line after `$ paver check` (that doesn't start with `$`) is treated
+    /// The line after `$ pave check` (that doesn't start with `$`) is treated
     /// as expected output using the `contains` strategy.
     ///
     /// This only applies to blocks that contain shell prompt lines (`$ ` or `> `).
@@ -601,11 +601,11 @@ impl ParsedDoc {
         (command_content, expected_output)
     }
 
-    /// Extract paver frontmatter from document content.
+    /// Extract pave frontmatter from document content.
     ///
     /// Looks for YAML frontmatter delimited by `---` at the start of the document.
-    /// Returns the paver-specific configuration if present.
-    fn extract_frontmatter(content: &str) -> Option<PaverFrontmatter> {
+    /// Returns the pave-specific configuration if present.
+    fn extract_frontmatter(content: &str) -> Option<PaveFrontmatter> {
         let trimmed = content.trim_start();
         let after_first = trimmed.strip_prefix("---")?;
 
@@ -613,9 +613,9 @@ impl ParsedDoc {
         let close_pos = after_first.find("\n---")?;
         let yaml_content = &after_first[..close_pos];
 
-        // Parse the YAML and extract paver section
+        // Parse the YAML and extract pave section
         let wrapper: FrontmatterWrapper = serde_yaml::from_str(yaml_content).ok()?;
-        wrapper.paver
+        wrapper.pave
     }
 }
 
@@ -1169,11 +1169,11 @@ $ make test
     }
 
     #[test]
-    fn paver_run_marker_makes_block_executable() {
+    fn pave_run_marker_makes_block_executable() {
         let content = r#"# Test
 
 ## Example
-<!-- paver:run -->
+<!-- pave:run -->
 ```python
 print("hello")
 ```
@@ -1189,11 +1189,11 @@ print("hello")
     }
 
     #[test]
-    fn paver_run_marker_without_spaces_works() {
+    fn pave_run_marker_without_spaces_works() {
         let content = r#"# Test
 
 ## Example
-<!--paver:run-->
+<!--pave:run-->
 ```ruby
 puts "hello"
 ```
@@ -1311,11 +1311,11 @@ $ npm test
     }
 
     #[test]
-    fn paver_run_marker_only_applies_to_next_block() {
+    fn pave_run_marker_only_applies_to_next_block() {
         let content = r#"# Test
 
 ## Steps
-<!-- paver:run -->
+<!-- pave:run -->
 ```python
 print("executable")
 ```
@@ -1333,9 +1333,9 @@ print("not executable")
     }
 
     #[test]
-    fn parse_document_with_paver_frontmatter() {
+    fn parse_document_with_pave_frontmatter() {
         let content = r#"---
-paver:
+pave:
   paths:
     - src/auth/
     - crates/auth/
@@ -1368,7 +1368,7 @@ No frontmatter here.
     }
 
     #[test]
-    fn parse_document_with_non_paver_frontmatter() {
+    fn parse_document_with_non_pave_frontmatter() {
         let content = r#"---
 title: My Document
 author: Someone
@@ -1376,7 +1376,7 @@ author: Someone
 # My Document
 
 ## Purpose
-Has frontmatter but not paver config.
+Has frontmatter but not pave config.
 "#;
 
         let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
@@ -1384,15 +1384,15 @@ Has frontmatter but not paver config.
     }
 
     #[test]
-    fn parse_document_with_empty_paver_paths() {
+    fn parse_document_with_empty_pave_paths() {
         let content = r#"---
-paver:
+pave:
   paths: []
 ---
 # Empty Paths
 
 ## Purpose
-Has paver section but empty paths.
+Has pave section but empty paths.
 "#;
 
         let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
@@ -1408,7 +1408,7 @@ Has paver section but empty paths.
 
 ## Verification
 ```bash
-$ paver check
+$ pave check
 Checked 5 documents: all checks passed
 ```
 "#;
@@ -1420,7 +1420,7 @@ Checked 5 documents: all checks passed
         let block = &section.code_blocks[0];
         assert!(block.is_executable);
         // Command should be extracted without the output
-        assert!(block.content.contains("$ paver check"));
+        assert!(block.content.contains("$ pave check"));
         assert!(!block.content.contains("Checked 5 documents"));
         // Expected output should be captured
         assert!(block.expected_output.is_some());
@@ -1437,7 +1437,7 @@ Checked 5 documents: all checks passed
 ```bash
 cargo test
 ```
-<!-- paver:expect:contains -->
+<!-- pave:expect:contains -->
 ```
 test result: ok
 ```
@@ -1464,7 +1464,7 @@ test result: ok
 ```bash
 cargo test
 ```
-<!-- paver:expect:regex -->
+<!-- pave:expect:regex -->
 ```
 test result: ok\. \d+ passed
 ```
@@ -1488,7 +1488,7 @@ test result: ok\. \d+ passed
 ```bash
 echo hello
 ```
-<!-- paver:expect:exact -->
+<!-- pave:expect:exact -->
 ```
 hello
 ```
@@ -1513,7 +1513,7 @@ hello
 ```bash
 echo test
 ```
-<!--paver:expect:contains-->
+<!--pave:expect:contains-->
 ```
 test
 ```
@@ -1535,7 +1535,7 @@ test
 ```bash
 echo test
 ```
-<!-- paver:expect -->
+<!-- pave:expect -->
 ```
 test
 ```
@@ -1595,9 +1595,9 @@ $ echo world
     }
 
     #[test]
-    fn parse_document_with_paver_working_dir_in_frontmatter() {
+    fn parse_document_with_pave_working_dir_in_frontmatter() {
         let content = r#"---
-paver:
+pave:
   working_dir: packages/api
 ---
 # API Component
@@ -1614,11 +1614,11 @@ API service.
     }
 
     #[test]
-    fn parse_paver_working_dir_inline_marker() {
+    fn parse_pave_working_dir_inline_marker() {
         let content = r#"# Test
 
 ## Verification
-<!-- paver:working_dir packages/api -->
+<!-- pave:working_dir packages/api -->
 ```bash
 npm test
 ```
@@ -1634,11 +1634,11 @@ npm test
     }
 
     #[test]
-    fn parse_paver_working_dir_inline_marker_without_spaces() {
+    fn parse_pave_working_dir_inline_marker_without_spaces() {
         let content = r#"# Test
 
 ## Verification
-<!--paver:working_dir src/components-->
+<!--pave:working_dir src/components-->
 ```bash
 npm test
 ```
@@ -1653,11 +1653,11 @@ npm test
     }
 
     #[test]
-    fn parse_paver_env_inline_marker() {
+    fn parse_pave_env_inline_marker() {
         let content = r#"# Test
 
 ## Verification
-<!-- paver:env TEST_DB=sqlite:memory -->
+<!-- pave:env TEST_DB=sqlite:memory -->
 ```bash
 cargo test
 ```
@@ -1677,12 +1677,12 @@ cargo test
     }
 
     #[test]
-    fn parse_multiple_paver_env_markers() {
+    fn parse_multiple_pave_env_markers() {
         let content = r#"# Test
 
 ## Verification
-<!-- paver:env DEBUG=1 -->
-<!-- paver:env LOG_LEVEL=trace -->
+<!-- pave:env DEBUG=1 -->
+<!-- pave:env LOG_LEVEL=trace -->
 ```bash
 cargo test
 ```
@@ -1707,12 +1707,12 @@ cargo test
     }
 
     #[test]
-    fn parse_paver_env_with_working_dir() {
+    fn parse_pave_env_with_working_dir() {
         let content = r#"# Test
 
 ## Verification
-<!-- paver:working_dir packages/api -->
-<!-- paver:env NODE_ENV=test -->
+<!-- pave:working_dir packages/api -->
+<!-- pave:env NODE_ENV=test -->
 ```bash
 npm test
 ```
@@ -1736,7 +1736,7 @@ npm test
         let content = r#"# Test
 
 ## Verification
-<!-- paver:working_dir packages/api -->
+<!-- pave:working_dir packages/api -->
 ```bash
 npm test
 ```

@@ -2,10 +2,10 @@
 
 ## Purpose
 
-The configuration system manages paver's `.paver.toml` file, which controls documentation paths, validation rules, and template settings. It provides a consistent way to customize paver's behavior per-project.
+The configuration system manages pave's `.pave.toml` file, which controls documentation paths, validation rules, and template settings. It provides a consistent way to customize pave's behavior per-project.
 
 **Non-goals:**
-- Not a global user configuration (each project has its own `.paver.toml`)
+- Not a global user configuration (each project has its own `.pave.toml`)
 - Not environment variable overrides (all config is in the TOML file)
 - Not configuration inheritance (no layered or merged configs)
 
@@ -13,11 +13,11 @@ The configuration system manages paver's `.paver.toml` file, which controls docu
 
 ### Config File Location
 
-Paver discovers configuration by searching for `.paver.toml` starting from the current directory and walking up to parent directories. The first file found is used.
+Pave discovers configuration by searching for `.pave.toml` starting from the current directory and walking up to parent directories. The first file found is used.
 
 ```
 project/
-├── .paver.toml      <- Found here
+├── .pave.toml      <- Found here
 ├── src/
 │   └── main.rs
 └── docs/
@@ -25,13 +25,13 @@ project/
         └── foo.md   <- Running from here still finds root config
 ```
 
-### PaverConfig Structure
+### PaveConfig Structure
 
 The configuration is divided into sections:
 
 | Section | Required | Description |
 |---------|----------|-------------|
-| `[paver]` | Yes | Tool metadata (version) |
+| `[pave]` | Yes | Tool metadata (version) |
 | `[docs]` | Yes | Documentation paths |
 | `[rules]` | No | Validation rules |
 | `[templates]` | No | Template file mappings |
@@ -41,15 +41,15 @@ The configuration is divided into sections:
 ### CLI Commands
 
 ```bash
-paver config get <key>      # Get a config value by dot notation
-paver config set <key> <value>  # Set a config value
-paver config list           # Show all configuration values
-paver config path           # Show path to config file
+pave config get <key>      # Get a config value by dot notation
+pave config set <key> <value>  # Set a config value
+pave config list           # Show all configuration values
+pave config path           # Show path to config file
 ```
 
 ## Configuration
 
-### [paver] Section
+### [pave] Section
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
@@ -79,7 +79,7 @@ paver config path           # Show path to config file
 | `runbook` | string | No | None | Filename for runbook template |
 | `adr` | string | No | None | Filename for ADR template |
 
-When set, paver looks for templates at `{docs.templates}/{templates.<type>}`. If not found, built-in templates are used.
+When set, pave looks for templates at `{docs.templates}/{templates.<type>}`. If not found, built-in templates are used.
 
 ### [mapping] Section
 
@@ -96,30 +96,30 @@ Exclude patterns support glob syntax:
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `run_verify` | boolean | No | `false` | Run `paver verify` in git hooks |
+| `run_verify` | boolean | No | `false` | Run `pave verify` in git hooks |
 
 ## Verification
 
 Verify configuration is loaded correctly:
 
 ```bash
-./target/release/paver config path
+./target/release/pave config path
 ```
 
 Check that configuration is used by other commands:
 
 ```bash
-./target/release/paver check docs/index.md
+./target/release/pave check docs/index.md
 ```
 
 ## Examples
 
 ### Minimal Configuration
 
-The minimum viable `.paver.toml`:
+The minimum viable `.pave.toml`:
 
 ```toml
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -131,7 +131,7 @@ root = "docs"
 A complete configuration with all options:
 
 ```toml
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -161,7 +161,7 @@ run_verify = true
 For projects with non-standard documentation paths:
 
 ```toml
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -174,7 +174,7 @@ templates = "documentation/templates"
 For projects that don't need strict validation:
 
 ```toml
-[paver]
+[pave]
 version = "0.1"
 
 [docs]
@@ -190,34 +190,34 @@ require_examples = false
 
 ```bash
 # Show where config file is located
-$ paver config path
-/path/to/project/.paver.toml
+$ pave config path
+/path/to/project/.pave.toml
 
 # List all configuration
-$ paver config list
+$ pave config list
 docs.root = "docs"
 docs.templates = "templates"
-paver.version = "0.1"
+pave.version = "0.1"
 rules.max_lines = 300
 rules.require_examples = true
 rules.require_verification = true
 
 # Get a specific value
-$ paver config get rules.max_lines
+$ pave config get rules.max_lines
 300
 
 # Change a value
-$ paver config set rules.max_lines 500
+$ pave config set rules.max_lines 500
 ```
 
 ## Gotchas
 
-- **Config not found**: Paver searches from the current directory up to the filesystem root. If no `.paver.toml` is found, commands fail with an error. Run `paver init` to create one.
-- **Empty values rejected**: `paver.version` and `docs.root` cannot be empty strings. Validation fails if they are.
+- **Config not found**: Pave searches from the current directory up to the filesystem root. If no `.pave.toml` is found, commands fail with an error. Run `pave init` to create one.
+- **Empty values rejected**: `pave.version` and `docs.root` cannot be empty strings. Validation fails if they are.
 - **Zero max_lines invalid**: `rules.max_lines` must be greater than 0.
 - **Template path is relative**: `docs.templates` is relative to the project root, not to `docs.root`.
-- **Dot notation for nested keys**: Use `docs.root` not `[docs] root` when using `paver config get/set`.
-- **Type coercion**: `paver config set` auto-detects types. `"300"` becomes integer `300`, `"true"` becomes boolean `true`. Quote strings if needed.
+- **Dot notation for nested keys**: Use `docs.root` not `[docs] root` when using `pave config get/set`.
+- **Type coercion**: `pave config set` auto-detects types. `"300"` becomes integer `300`, `"true"` becomes boolean `true`. Quote strings if needed.
 
 ## Decisions
 

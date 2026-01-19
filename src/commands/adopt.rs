@@ -1,7 +1,7 @@
 //! Adopt command for scanning existing documentation.
 //!
-//! This module implements the `paver adopt` command which scans existing
-//! documentation to help users onboard paver into projects that already have docs.
+//! This module implements the `pave adopt` command which scans existing
+//! documentation to help users onboard pave into projects that already have docs.
 
 use anyhow::{Context, Result};
 use serde::Serialize;
@@ -20,7 +20,7 @@ pub struct AdoptArgs {
     pub format: AdoptOutputFormat,
     /// Whether to print suggested config.
     pub suggest_config: bool,
-    /// Whether to show what paver init would create (without creating).
+    /// Whether to show what pave init would create (without creating).
     pub dry_run: bool,
 }
 
@@ -124,7 +124,7 @@ pub fn execute(args: AdoptArgs) -> Result<()> {
                 },
                 documents: Vec::new(),
                 recommendations: vec![
-                    "No documentation found. Run 'paver init' to create initial documentation."
+                    "No documentation found. Run 'pave init' to create initial documentation."
                         .to_string(),
                 ],
             };
@@ -138,7 +138,7 @@ pub fn execute(args: AdoptArgs) -> Result<()> {
             println!("  - doc/");
             println!("  - README.md");
             println!();
-            println!("Run 'paver init' to create initial documentation structure.");
+            println!("Run 'pave init' to create initial documentation structure.");
         }
         return Ok(());
     }
@@ -168,14 +168,14 @@ pub fn execute(args: AdoptArgs) -> Result<()> {
                 documents: Vec::new(),
                 recommendations: vec![
                     "Documentation directory exists but contains no markdown files.".to_string(),
-                    "Run 'paver init' to create initial documentation structure.".to_string(),
+                    "Run 'pave init' to create initial documentation structure.".to_string(),
                 ],
             };
             println!("{}", serde_json::to_string_pretty(&report)?);
         } else {
             println!("No markdown files found in '{}'.", docs_root.display());
             println!();
-            println!("Run 'paver init' to create initial documentation structure.");
+            println!("Run 'pave init' to create initial documentation structure.");
         }
         return Ok(());
     }
@@ -296,7 +296,7 @@ fn scan_docs_recursive(
                     | ".github"
                     | "templates"
                     | "_site"
-                    | ".paver"
+                    | ".pave"
                     | "vendor"
                     | "build"
             ) {
@@ -508,16 +508,16 @@ fn output_text_report(report: &AdoptionReport) {
     }
 
     println!();
-    println!("Run 'paver adopt --suggest-config' to see recommended .paver.toml");
+    println!("Run 'pave adopt --suggest-config' to see recommended .pave.toml");
 }
 
 /// Output suggested configuration.
 fn output_suggested_config(report: &AdoptionReport) {
     let summary = &report.summary;
 
-    println!("Suggested .paver.toml:");
+    println!("Suggested .pave.toml:");
     println!();
-    println!("[paver]");
+    println!("[pave]");
     println!("version = \"0.1\"");
     println!();
     println!("[docs]");
@@ -556,7 +556,7 @@ fn output_suggested_config(report: &AdoptionReport) {
 
 /// Output dry-run information.
 fn output_dry_run(report: &AdoptionReport) {
-    println!("Dry run: What 'paver init' would create:");
+    println!("Dry run: What 'pave init' would create:");
     println!();
 
     let docs_root = report
@@ -566,7 +566,7 @@ fn output_dry_run(report: &AdoptionReport) {
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "docs".to_string());
 
-    println!("  .paver.toml - Configuration file");
+    println!("  .pave.toml - Configuration file");
 
     // Check if templates directory would be created
     let has_templates_dir = report

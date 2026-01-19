@@ -36,10 +36,10 @@ Commands can optionally include shell prompts (`$` or `>`), which are stripped b
 ```markdown
 ## Verification
 ```bash
-$ paver --version
-# Expected: paver 0.1.0
+$ pave --version
+# Expected: pave 0.1.0
 
-$ paver check
+$ pave check
 # Expected: exits 0 if all docs pass
 ```
 ```
@@ -60,7 +60,7 @@ By default, commands are expected to exit with code 0. Commands that exit non-ze
 ### CLI Usage
 
 ```bash
-paver verify [paths...] [options]
+pave verify [paths...] [options]
 ```
 
 | Option | Description |
@@ -97,7 +97,7 @@ Verified 1 document: 2 commands passed
 
 ## Configuration
 
-Verification uses the standard `.paver.toml` configuration to locate the docs root. No additional configuration is required.
+Verification uses the standard `.pave.toml` configuration to locate the docs root. No additional configuration is required.
 
 Verification is enabled when:
 1. A document has a `## Verification` section
@@ -168,7 +168,7 @@ This executes: `cargo build && cargo test`
 Run verification in CI with JSON output:
 
 ```bash
-paver verify --format github --keep-going
+pave verify --format github --keep-going
 ```
 
 The `--keep-going` flag ensures all documents are verified even if some fail, giving a complete picture of verification status.
@@ -180,10 +180,10 @@ The `--keep-going` flag ensures all documents are verified even if some fail, gi
 ## Verification
 ```bash
 # Check version
-paver --version
+pave --version
 
 # Validate docs pass
-paver check docs/
+pave check docs/
 ```
 ```
 
@@ -209,7 +209,7 @@ cargo test verification
 
 ## Gotchas
 
-- **Commands run from project root**: All commands execute from the directory containing `.paver.toml`, not from the doc's directory.
+- **Commands run from project root**: All commands execute from the directory containing `.pave.toml`, not from the doc's directory.
 - **Shell required**: Commands run via `sh -c`, so shell features like pipes and redirects work.
 - **Output not validated**: Currently only exit codes are checked. Output matching is not yet supported.
 - **Timeout applies per-command**: The `--timeout` flag sets the limit for each individual command, not the total run time.
