@@ -69,18 +69,36 @@ exit 0
 }
 
 /// Find the git hooks directory, searching up from the current directory.
+/// Supports both regular git repositories and git worktrees.
 fn find_git_hooks_dir() -> Result<std::path::PathBuf> {
     let mut current = std::env::current_dir()?;
 
     loop {
-        let git_dir = current.join(".git");
-        if git_dir.is_dir() {
-            let hooks_dir = git_dir.join("hooks");
+        let git_path = current.join(".git");
+
+        // Check if .git is a directory (regular repo)
+        if git_path.is_dir() {
+            let hooks_dir = git_path.join("hooks");
             // Create hooks directory if it doesn't exist (bare .git may not have it)
             if !hooks_dir.exists() {
                 fs::create_dir_all(&hooks_dir).context("Failed to create .git/hooks directory")?;
             }
             return Ok(hooks_dir);
+        }
+
+        // Check if .git is a file (worktree) - contains "gitdir: <path>"
+        if git_path.is_file() {
+            let content = fs::read_to_string(&git_path).context("Failed to read .git file")?;
+            if let Some(gitdir) = content.strip_prefix("gitdir: ") {
+                let gitdir = gitdir.trim();
+                let hooks_dir = std::path::PathBuf::from(gitdir).join("hooks");
+                // Create hooks directory if it doesn't exist
+                if !hooks_dir.exists() {
+                    fs::create_dir_all(&hooks_dir)
+                        .context("Failed to create hooks directory in worktree")?;
+                }
+                return Ok(hooks_dir);
+            }
         }
 
         if !current.pop() {
@@ -385,5 +403,61 @@ mod tests {
         assert!(script.contains("while read local_ref local_sha"));
         assert!(script.contains("$remote_sha\"..\"$local_sha"));
         assert!(script.contains("grep \"^$DOCS_ROOT/.*\\.md$\""));
+    }
+
+    /// Helper to create a fake git worktree structure.
+    fn setup_git_worktree(temp_dir: &TempDir) -> TempDir {
+        // Create the "main" git repo directory
+        let main_repo = TempDir::new().unwrap();
+        let worktree_git_dir = main_repo.path().join(".git/worktrees/test-worktree");
+        fs::create_dir_all(&worktree_git_dir).unwrap();
+
+        // Create .git file in the worktree pointing to the gitdir
+        let git_file = temp_dir.path().join(".git");
+        fs::write(&git_file, format!("gitdir: {}", worktree_git_dir.display())).unwrap();
+
+        main_repo
+    }
+
+    #[test]
+    fn install_works_in_worktree() {
+        let temp_dir = TempDir::new().unwrap();
+        let main_repo = setup_git_worktree(&temp_dir);
+
+        with_working_dir(temp_dir.path(), || {
+            install(HookType::PreCommit, false).unwrap();
+        });
+
+        // Hook should be in the worktree's git dir, not the main .git
+        let hook_path = main_repo
+            .path()
+            .join(".git/worktrees/test-worktree/hooks/pre-commit");
+        assert!(hook_path.exists());
+
+        let content = fs::read_to_string(&hook_path).unwrap();
+        assert!(content.contains(PAVER_HOOK_MARKER));
+    }
+
+    #[test]
+    fn uninstall_works_in_worktree() {
+        let temp_dir = TempDir::new().unwrap();
+        let main_repo = setup_git_worktree(&temp_dir);
+
+        // Install first
+        with_working_dir(temp_dir.path(), || {
+            install(HookType::PreCommit, false).unwrap();
+        });
+
+        let hook_path = main_repo
+            .path()
+            .join(".git/worktrees/test-worktree/hooks/pre-commit");
+        assert!(hook_path.exists());
+
+        // Uninstall
+        with_working_dir(temp_dir.path(), || {
+            uninstall(HookType::PreCommit).unwrap();
+        });
+
+        assert!(!hook_path.exists());
     }
 }
