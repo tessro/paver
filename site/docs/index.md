@@ -27,6 +27,7 @@ paver is a CLI tool for creating, validating, and managing **PAVED** documentati
 |-------|-------------|
 | [Getting Started](/docs/getting-started/) | Set up paver in a new project |
 | [Onboarding Existing Projects](/docs/onboarding-existing-projects/) | Adopt paver in an existing codebase |
+| [CI/CD Integration](/docs/ci-integration/) | Run paver in CI pipelines |
 
 ## Document Types 📑
 

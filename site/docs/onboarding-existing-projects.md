@@ -167,6 +167,8 @@ The `--format github` flag outputs annotations that appear inline on PRs.
 
 During gradual mode, validation passes even with errors (they're reported as warnings).
 
+For more CI patterns including GitLab CI, JSON output, and troubleshooting, see the [CI/CD Integration Guide](/docs/ci-integration/).
+
 ## Step 5: Install Git Hooks
 
 Install pre-commit hooks to catch issues before they're pushed:
