@@ -10,6 +10,7 @@ use pave::commands::changed::{self, ChangedArgs};
 use pave::commands::check::{self, CheckArgs};
 use pave::commands::config;
 use pave::commands::coverage::{self, CoverageArgs};
+use pave::commands::coverage_changed::{self, CoverageChangedArgs};
 use pave::commands::doctor::{self, DoctorArgs};
 use pave::commands::hooks;
 use pave::commands::index;
@@ -180,6 +181,19 @@ fn main() -> Result<()> {
                 path,
                 format,
                 threshold,
+                include,
+                exclude,
+            })?;
+        }
+        Command::CoverageChanged {
+            base,
+            format,
+            include,
+            exclude,
+        } => {
+            coverage_changed::execute(CoverageChangedArgs {
+                base,
+                format,
                 include,
                 exclude,
             })?;

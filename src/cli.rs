@@ -228,6 +228,25 @@ pub enum Command {
         exclude: Vec<String>,
     },
 
+    /// Check if newly added code files are covered by documentation
+    CoverageChanged {
+        /// Git ref to compare against [default: HEAD~1 or origin/main]
+        #[arg(long)]
+        base: Option<String>,
+
+        /// Output format: text, json
+        #[arg(long, default_value = "text", value_enum)]
+        format: CoverageOutputFormat,
+
+        /// Only consider these code patterns (can be specified multiple times)
+        #[arg(long = "include", value_name = "PATTERN")]
+        include: Vec<String>,
+
+        /// Exclude these code patterns (can be specified multiple times)
+        #[arg(long = "exclude", value_name = "PATTERN")]
+        exclude: Vec<String>,
+    },
+
     /// Check prose quality (links, references, style)
     Lint {
         /// Specific files or directories to lint [default: docs root from config]
