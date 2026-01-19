@@ -4,7 +4,24 @@
 //! about their sections, code blocks, and commands for validation purposes.
 
 use anyhow::{Context, Result};
+use serde::Deserialize;
 use std::path::{Path, PathBuf};
+
+/// Paver-specific frontmatter configuration.
+#[derive(Debug, Clone, Deserialize, PartialEq, Default)]
+pub struct PaverFrontmatter {
+    /// Code paths that this document covers.
+    #[serde(default)]
+    pub paths: Vec<String>,
+}
+
+/// YAML frontmatter wrapper.
+#[derive(Debug, Clone, Deserialize, PartialEq, Default)]
+struct FrontmatterWrapper {
+    /// Paver-specific configuration.
+    #[serde(default)]
+    paver: Option<PaverFrontmatter>,
+}
 
 /// A parsed PAVED document with extracted structure.
 #[derive(Debug)]
@@ -17,6 +34,8 @@ pub struct ParsedDoc {
     pub sections: Vec<Section>,
     /// Total number of lines in the document.
     pub line_count: usize,
+    /// Paver-specific frontmatter configuration.
+    pub frontmatter: Option<PaverFrontmatter>,
 }
 
 /// A fenced code block extracted from a section.
@@ -75,6 +94,7 @@ impl ParsedDoc {
         let lines: Vec<&str> = content.lines().collect();
         let line_count = lines.len();
 
+        let frontmatter = Self::extract_frontmatter(content);
         let title = Self::extract_title(&lines);
         let sections = Self::extract_sections(&lines);
 
@@ -83,6 +103,7 @@ impl ParsedDoc {
             title,
             sections,
             line_count,
+            frontmatter,
         })
     }
 
@@ -322,6 +343,23 @@ impl ParsedDoc {
     fn has_paver_run_marker(line: &str) -> bool {
         let trimmed = line.trim();
         trimmed.contains("<!-- paver:run -->") || trimmed.contains("<!--paver:run-->")
+    }
+
+    /// Extract paver frontmatter from document content.
+    ///
+    /// Looks for YAML frontmatter delimited by `---` at the start of the document.
+    /// Returns the paver-specific configuration if present.
+    fn extract_frontmatter(content: &str) -> Option<PaverFrontmatter> {
+        let trimmed = content.trim_start();
+        let after_first = trimmed.strip_prefix("---")?;
+
+        // Find the closing ---
+        let close_pos = after_first.find("\n---")?;
+        let yaml_content = &after_first[..close_pos];
+
+        // Parse the YAML and extract paver section
+        let wrapper: FrontmatterWrapper = serde_yaml::from_str(yaml_content).ok()?;
+        wrapper.paver
     }
 }
 
@@ -943,5 +981,75 @@ print("not executable")
         assert_eq!(section.code_blocks.len(), 2);
         assert!(section.code_blocks[0].is_executable);
         assert!(!section.code_blocks[1].is_executable);
+    }
+
+    #[test]
+    fn parse_document_with_paver_frontmatter() {
+        let content = r#"---
+paver:
+  paths:
+    - src/auth/
+    - crates/auth/
+---
+# Auth Component
+
+## Purpose
+Authentication handling.
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+
+        assert!(doc.frontmatter.is_some());
+        let frontmatter = doc.frontmatter.unwrap();
+        assert_eq!(frontmatter.paths.len(), 2);
+        assert_eq!(frontmatter.paths[0], "src/auth/");
+        assert_eq!(frontmatter.paths[1], "crates/auth/");
+    }
+
+    #[test]
+    fn parse_document_without_frontmatter() {
+        let content = r#"# Simple Doc
+
+## Purpose
+No frontmatter here.
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        assert!(doc.frontmatter.is_none());
+    }
+
+    #[test]
+    fn parse_document_with_non_paver_frontmatter() {
+        let content = r#"---
+title: My Document
+author: Someone
+---
+# My Document
+
+## Purpose
+Has frontmatter but not paver config.
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        assert!(doc.frontmatter.is_none());
+    }
+
+    #[test]
+    fn parse_document_with_empty_paver_paths() {
+        let content = r#"---
+paver:
+  paths: []
+---
+# Empty Paths
+
+## Purpose
+Has paver section but empty paths.
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+
+        assert!(doc.frontmatter.is_some());
+        let frontmatter = doc.frontmatter.unwrap();
+        assert!(frontmatter.paths.is_empty());
     }
 }

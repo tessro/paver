@@ -23,6 +23,9 @@ pub struct PaverConfig {
     /// Template configuration.
     #[serde(default)]
     pub templates: TemplatesSection,
+    /// Code-to-documentation mapping configuration.
+    #[serde(default)]
+    pub mapping: MappingSection,
 }
 
 /// Paver tool metadata section.
@@ -68,6 +71,14 @@ pub struct TemplatesSection {
     /// Filename for ADR template.
     #[serde(default)]
     pub adr: Option<String>,
+}
+
+/// Code-to-documentation mapping section.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct MappingSection {
+    /// Global path patterns to exclude from mapping.
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 fn default_max_lines() -> u32 {
@@ -301,5 +312,46 @@ require_examples = false
         assert_eq!(config.rules.max_lines, 500);
         assert!(!config.rules.require_verification);
         assert!(!config.rules.require_examples);
+    }
+
+    #[test]
+    fn parse_config_with_mapping_section() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+
+[mapping]
+exclude = ["target/", "node_modules/", "*.generated.rs"]
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert_eq!(config.mapping.exclude.len(), 3);
+        assert_eq!(config.mapping.exclude[0], "target/");
+        assert_eq!(config.mapping.exclude[1], "node_modules/");
+        assert_eq!(config.mapping.exclude[2], "*.generated.rs");
+    }
+
+    #[test]
+    fn parse_config_without_mapping_uses_default() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(config.mapping.exclude.is_empty());
+    }
+
+    #[test]
+    fn config_roundtrip_with_mapping() {
+        let mut config = PaverConfig::default();
+        config.mapping.exclude = vec!["target/".to_string(), "*.tmp".to_string()];
+        let serialized = toml::to_string_pretty(&config).unwrap();
+        let deserialized = PaverConfig::parse(&serialized).unwrap();
+        assert_eq!(config, deserialized);
     }
 }
