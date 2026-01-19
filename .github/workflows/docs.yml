@@ -1,21 +1,40 @@
-name: Documentation
+name: Documentation Validation
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - '.paver.toml'
   pull_request:
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - '.paver.toml'
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
       - name: Build paver
         run: cargo build --release
 
-      - name: Validate documentation
+      - name: Run paver check
         run: ./target/release/paver check --strict
+
+      - name: Run paver verify
+        run: ./target/release/paver verify --keep-going
+
+      - name: Check impacted docs
+        run: ./target/release/paver changed --strict
