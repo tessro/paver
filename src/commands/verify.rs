@@ -603,29 +603,21 @@ fn output_text(results: &VerifyResults) {
                         code, cmd.expected_exit_code
                     );
                 }
-                // Always show stdout/stderr for failed commands to aid debugging
+                // Always show full stdout/stderr for failed commands to aid debugging
                 if let Some(stdout) = &cmd.stdout
                     && !stdout.is_empty()
                 {
-                    let lines: Vec<&str> = stdout.lines().collect();
                     println!("    stdout:");
-                    for line in lines.iter().take(10) {
+                    for line in stdout.lines() {
                         println!("      {}", line);
-                    }
-                    if lines.len() > 10 {
-                        println!("      ... ({} more lines)", lines.len() - 10);
                     }
                 }
                 if let Some(stderr) = &cmd.stderr
                     && !stderr.is_empty()
                 {
-                    let lines: Vec<&str> = stderr.lines().collect();
                     println!("    stderr:");
-                    for line in lines.iter().take(10) {
+                    for line in stderr.lines() {
                         println!("      {}", line);
-                    }
-                    if lines.len() > 10 {
-                        println!("      ... ({} more lines)", lines.len() - 10);
                     }
                 }
                 // Print debugging suggestion
