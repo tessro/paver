@@ -9,16 +9,6 @@ The verification system extracts and executes commands from the `## Verification
 - Not a CI pipeline (use GitHub Actions, Jenkins for orchestration)
 - Doesn't manage test data or fixtures
 
-## Verification
-
-```bash
-cargo test verification 2>&1 | grep "test result: ok"
-```
-
-```bash
-cargo build --release
-```
-
 ## Interface
 
 ### Command Format
@@ -205,6 +195,16 @@ paver check docs/
 cargo build --all-targets
 npm run test:e2e
 ```
+```
+
+## Verification
+
+```bash
+cargo build --release
+```
+
+```bash
+cargo test verification 2>&1 | grep "test result: ok"
 ```
 
 ## Gotchas

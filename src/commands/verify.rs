@@ -541,20 +541,38 @@ fn output_text(results: &VerifyResults) {
             println!("  [{}]{} {}", status_str, duration_str, cmd.command);
 
             // Show failure details
-            if cmd.status == VerifyStatus::Fail {
-                if let Some(code) = cmd.exit_code
-                    && code != cmd.expected_exit_code
-                {
-                    println!(
-                        "    exit code: {} (expected {})",
-                        code, cmd.expected_exit_code
-                    );
+            if cmd.status == VerifyStatus::Fail || cmd.status == VerifyStatus::Timeout {
+                if let Some(code) = cmd.exit_code {
+                    if code != cmd.expected_exit_code {
+                        println!(
+                            "    exit code: {} (expected {})",
+                            code, cmd.expected_exit_code
+                        );
+                    }
                 }
-                if let Some(stderr) = &cmd.stderr
-                    && !stderr.is_empty()
-                {
-                    for line in stderr.lines().take(5) {
-                        println!("    stderr: {}", line);
+                // Always show stdout/stderr for failed commands to aid debugging
+                if let Some(stdout) = &cmd.stdout {
+                    if !stdout.is_empty() {
+                        let lines: Vec<&str> = stdout.lines().collect();
+                        println!("    stdout:");
+                        for line in lines.iter().take(10) {
+                            println!("      {}", line);
+                        }
+                        if lines.len() > 10 {
+                            println!("      ... ({} more lines)", lines.len() - 10);
+                        }
+                    }
+                }
+                if let Some(stderr) = &cmd.stderr {
+                    if !stderr.is_empty() {
+                        let lines: Vec<&str> = stderr.lines().collect();
+                        println!("    stderr:");
+                        for line in lines.iter().take(10) {
+                            println!("      {}", line);
+                        }
+                        if lines.len() > 10 {
+                            println!("      ... ({} more lines)", lines.len() - 10);
+                        }
                     }
                 }
             }

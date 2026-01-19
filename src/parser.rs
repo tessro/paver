@@ -161,10 +161,23 @@ impl ParsedDoc {
     fn extract_sections(lines: &[&str]) -> Vec<Section> {
         let mut sections = Vec::new();
         let mut section_starts: Vec<(usize, String)> = Vec::new();
+        let mut in_code_block = false;
 
-        // Find all H2 headings and their positions
+        // Find all H2 headings and their positions, skipping content inside code blocks
         for (idx, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
+
+            // Track code block state
+            if trimmed.starts_with("```") {
+                in_code_block = !in_code_block;
+                continue;
+            }
+
+            // Skip headings inside code blocks
+            if in_code_block {
+                continue;
+            }
+
             if let Some(heading) = trimmed.strip_prefix("## ") {
                 // Ensure it's not an H3 (### ) heading
                 if !heading.starts_with("# ") {
@@ -666,6 +679,43 @@ Content line 2.
 
         assert_eq!(first.start_line, 3);
         assert_eq!(second.start_line, 6);
+    }
+
+    #[test]
+    fn skip_headings_inside_code_blocks() {
+        let content = r#"# Test
+
+## Purpose
+Real purpose section.
+
+## Interface
+Here's an example markdown file:
+
+```markdown
+## Verification
+Fake verification inside code block.
+```
+
+## Verification
+Real verification section.
+```bash
+cargo test
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+
+        // Should have 3 sections: Purpose, Interface, Verification
+        // The "## Verification" inside the markdown code block should be ignored
+        assert_eq!(doc.sections.len(), 3);
+        assert!(doc.has_section("Purpose"));
+        assert!(doc.has_section("Interface"));
+        assert!(doc.has_section("Verification"));
+
+        // The Verification section should be the real one (line 17), not the fake one inside code block
+        let verification = doc.get_section("Verification").unwrap();
+        assert!(verification.content.contains("Real verification section"));
+        assert!(!verification.content.contains("Fake verification"));
     }
 
     #[test]
