@@ -18,7 +18,7 @@ fn main() -> Result<()> {
         Command::Init(args) => {
             init::run(init::InitArgs {
                 docs_root: args.docs_root,
-                hooks: args.hooks,
+                skip_hooks: args.skip_hooks,
                 force: args.force,
                 working_dir: None,
             })?;

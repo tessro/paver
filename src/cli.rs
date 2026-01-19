@@ -236,9 +236,9 @@ pub struct InitArgs {
     #[arg(long, default_value = "docs")]
     pub docs_root: String,
 
-    /// Also install git hooks for validation
+    /// Skip installing git pre-commit hook
     #[arg(long)]
-    pub hooks: bool,
+    pub skip_hooks: bool,
 
     /// Overwrite existing files
     #[arg(long)]

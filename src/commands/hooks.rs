@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::cli::HookType;
 
 /// Marker comment to identify paver-installed hooks.
-const PAVER_HOOK_MARKER: &str = "# Installed by paver";
+pub const PAVER_HOOK_MARKER: &str = "# Installed by paver";
 
 /// Generate the hook script content for the given hook type.
 fn generate_hook_script(hook_type: HookType) -> String {
@@ -68,37 +68,47 @@ exit 0
     }
 }
 
+/// Find the git hooks directory starting from the given base path.
+/// Supports both regular git repositories and git worktrees.
+pub fn find_git_hooks_dir_from(base: &Path) -> Result<std::path::PathBuf> {
+    let git_path = base.join(".git");
+
+    // Check if .git is a directory (regular repo)
+    if git_path.is_dir() {
+        let hooks_dir = git_path.join("hooks");
+        // Create hooks directory if it doesn't exist (bare .git may not have it)
+        if !hooks_dir.exists() {
+            fs::create_dir_all(&hooks_dir).context("Failed to create .git/hooks directory")?;
+        }
+        return Ok(hooks_dir);
+    }
+
+    // Check if .git is a file (worktree) - contains "gitdir: <path>"
+    if git_path.is_file() {
+        let content = fs::read_to_string(&git_path).context("Failed to read .git file")?;
+        if let Some(gitdir) = content.strip_prefix("gitdir: ") {
+            let gitdir = gitdir.trim();
+            let hooks_dir = std::path::PathBuf::from(gitdir).join("hooks");
+            // Create hooks directory if it doesn't exist
+            if !hooks_dir.exists() {
+                fs::create_dir_all(&hooks_dir)
+                    .context("Failed to create hooks directory in worktree")?;
+            }
+            return Ok(hooks_dir);
+        }
+    }
+
+    bail!("Not a git repository (no .git directory found)")
+}
+
 /// Find the git hooks directory, searching up from the current directory.
 /// Supports both regular git repositories and git worktrees.
 fn find_git_hooks_dir() -> Result<std::path::PathBuf> {
     let mut current = std::env::current_dir()?;
 
     loop {
-        let git_path = current.join(".git");
-
-        // Check if .git is a directory (regular repo)
-        if git_path.is_dir() {
-            let hooks_dir = git_path.join("hooks");
-            // Create hooks directory if it doesn't exist (bare .git may not have it)
-            if !hooks_dir.exists() {
-                fs::create_dir_all(&hooks_dir).context("Failed to create .git/hooks directory")?;
-            }
+        if let Ok(hooks_dir) = find_git_hooks_dir_from(&current) {
             return Ok(hooks_dir);
-        }
-
-        // Check if .git is a file (worktree) - contains "gitdir: <path>"
-        if git_path.is_file() {
-            let content = fs::read_to_string(&git_path).context("Failed to read .git file")?;
-            if let Some(gitdir) = content.strip_prefix("gitdir: ") {
-                let gitdir = gitdir.trim();
-                let hooks_dir = std::path::PathBuf::from(gitdir).join("hooks");
-                // Create hooks directory if it doesn't exist
-                if !hooks_dir.exists() {
-                    fs::create_dir_all(&hooks_dir)
-                        .context("Failed to create hooks directory in worktree")?;
-                }
-                return Ok(hooks_dir);
-            }
         }
 
         if !current.pop() {
@@ -121,6 +131,63 @@ fn is_paver_hook(path: &Path) -> bool {
 /// Install a git hook for documentation validation.
 pub fn install(hook_type: HookType, force: bool) -> Result<()> {
     let hooks_dir = find_git_hooks_dir()?;
+    install_hook_in_dir(&hooks_dir, hook_type, force)
+}
+
+/// Install a git hook at a specific base path (for use by init command).
+///
+/// Options for `init_mode`:
+/// - If `true` (init mode): silently skips if paver hook exists, warns for foreign hooks
+/// - If `false` (explicit install): follows normal install behavior with messages
+pub fn install_at(base: &Path, hook_type: HookType, init_mode: bool) -> Result<()> {
+    let hooks_dir = find_git_hooks_dir_from(base)?;
+    let hook_path = hooks_dir.join(hook_type.filename());
+
+    // Check if hook already exists
+    if hook_path.exists() {
+        if is_paver_hook(&hook_path) {
+            // Already installed by paver, nothing to do
+            return Ok(());
+        } else {
+            // Foreign hook exists
+            if init_mode {
+                println!("Warning: pre-commit hook already exists, skipping hook installation.");
+                println!(
+                    "Run 'paver hooks install --force' to overwrite, or add 'paver check' manually."
+                );
+                return Ok(());
+            } else {
+                bail!(
+                    "Hook '{}' already exists (not installed by paver). Use --force to overwrite.",
+                    hook_type.filename()
+                );
+            }
+        }
+    }
+
+    let hook_content = generate_hook_script(hook_type);
+    fs::write(&hook_path, &hook_content)
+        .with_context(|| format!("Failed to write {} hook", hook_type.filename()))?;
+
+    // Make the hook executable on Unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&hook_path)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&hook_path, perms)?;
+    }
+
+    println!(
+        "Installed git {} hook for documentation validation.",
+        hook_type.filename()
+    );
+
+    Ok(())
+}
+
+/// Internal function to install a hook in a specific hooks directory.
+fn install_hook_in_dir(hooks_dir: &Path, hook_type: HookType, force: bool) -> Result<()> {
     let hook_path = hooks_dir.join(hook_type.filename());
 
     // Check if hook already exists

@@ -4,6 +4,8 @@ use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::Path;
 
+use crate::cli::HookType;
+use crate::commands::hooks;
 use crate::templates::{TemplateType, get_template};
 
 /// Default content for the .paver.toml configuration file.
@@ -35,8 +37,8 @@ fn get_index_template() -> &'static str {
 pub struct InitArgs {
     /// Where to create the docs directory (default: "docs")
     pub docs_root: String,
-    /// Also install git hooks for validation
-    pub hooks: bool,
+    /// Skip installing git pre-commit hook
+    pub skip_hooks: bool,
     /// Overwrite existing files
     pub force: bool,
     /// Working directory (for testing; uses current dir if None)
@@ -47,7 +49,7 @@ impl Default for InitArgs {
     fn default() -> Self {
         Self {
             docs_root: "docs".to_string(),
-            hooks: false,
+            skip_hooks: false,
             force: false,
             working_dir: None,
         }
@@ -98,8 +100,8 @@ pub fn run(args: InitArgs) -> Result<()> {
         }
     }
 
-    // Handle git hooks if requested
-    if args.hooks {
+    // Install git pre-commit hook by default (unless skipped)
+    if !args.skip_hooks {
         install_git_hooks(&base)?;
     }
 
@@ -127,54 +129,30 @@ pub fn run(args: InitArgs) -> Result<()> {
 
 /// Install git hooks for documentation validation.
 fn install_git_hooks(base: &Path) -> Result<()> {
-    let git_hooks_dir = base.join(".git/hooks");
-
-    if !git_hooks_dir.exists() {
-        bail!("Not a git repository (no .git/hooks directory found)");
-    }
-
-    let pre_commit_path = git_hooks_dir.join("pre-commit");
-
-    // Check if pre-commit hook already exists
-    if pre_commit_path.exists() {
-        println!("Warning: pre-commit hook already exists, skipping hook installation.");
-        println!("Add 'paver check' to your existing hook manually.");
-        return Ok(());
-    }
-
-    let hook_content = r#"#!/bin/sh
-# PAVED documentation validation hook
-# Installed by: paver init --hooks
-
-paver check
-"#;
-
-    fs::write(&pre_commit_path, hook_content).context("Failed to write pre-commit hook")?;
-
-    // Make the hook executable on Unix
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&pre_commit_path)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&pre_commit_path, perms)?;
-    }
-
-    println!("Installed git pre-commit hook for documentation validation.");
-
-    Ok(())
+    // Use the shared hook installation from the hooks module
+    // init_mode=true means: silently skip if paver hook exists, warn for foreign hooks
+    hooks::install_at(base, HookType::PreCommit, true)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::hooks::PAVER_HOOK_MARKER;
     use std::fs;
     use tempfile::TempDir;
+
+    /// Helper to create a fake git repo structure for testing.
+    fn setup_git_repo(temp_dir: &TempDir) {
+        let git_dir = temp_dir.path().join(".git");
+        let hooks_dir = git_dir.join("hooks");
+        fs::create_dir_all(&hooks_dir).unwrap();
+    }
 
     #[test]
     fn init_creates_expected_files() {
         let temp_dir = TempDir::new().unwrap();
         let args = InitArgs {
+            skip_hooks: true,
             working_dir: Some(temp_dir.path().to_path_buf()),
             ..Default::default()
         };
@@ -192,6 +170,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let args = InitArgs {
             docs_root: "custom/path".to_string(),
+            skip_hooks: true,
             working_dir: Some(temp_dir.path().to_path_buf()),
             ..Default::default()
         };
@@ -217,6 +196,7 @@ mod tests {
 
         // First init should succeed
         let args = InitArgs {
+            skip_hooks: true,
             working_dir: Some(temp_dir.path().to_path_buf()),
             ..Default::default()
         };
@@ -224,6 +204,7 @@ mod tests {
 
         // Second init should fail
         let args = InitArgs {
+            skip_hooks: true,
             working_dir: Some(temp_dir.path().to_path_buf()),
             ..Default::default()
         };
@@ -243,6 +224,7 @@ mod tests {
 
         // First init
         let args = InitArgs {
+            skip_hooks: true,
             working_dir: Some(temp_dir.path().to_path_buf()),
             ..Default::default()
         };
@@ -254,6 +236,7 @@ mod tests {
         // Second init with force should succeed and overwrite
         let args = InitArgs {
             force: true,
+            skip_hooks: true,
             working_dir: Some(temp_dir.path().to_path_buf()),
             ..Default::default()
         };
@@ -269,5 +252,131 @@ mod tests {
         let config = default_config("docs");
         let parsed: Result<toml::Value, _> = toml::from_str(&config);
         assert!(parsed.is_ok(), "Generated config should be valid TOML");
+    }
+
+    #[test]
+    fn init_installs_hook_by_default_in_git_repo() {
+        let temp_dir = TempDir::new().unwrap();
+        setup_git_repo(&temp_dir);
+
+        let args = InitArgs {
+            working_dir: Some(temp_dir.path().to_path_buf()),
+            ..Default::default()
+        };
+        run(args).unwrap();
+
+        // Verify hook was installed
+        let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
+        assert!(hook_path.exists());
+
+        let content = fs::read_to_string(&hook_path).unwrap();
+        assert!(content.contains(PAVER_HOOK_MARKER));
+        assert!(content.contains("paver check"));
+    }
+
+    #[test]
+    fn init_skip_hooks_does_not_install_hook() {
+        let temp_dir = TempDir::new().unwrap();
+        setup_git_repo(&temp_dir);
+
+        let args = InitArgs {
+            skip_hooks: true,
+            working_dir: Some(temp_dir.path().to_path_buf()),
+            ..Default::default()
+        };
+        run(args).unwrap();
+
+        // Verify hook was NOT installed
+        let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
+        assert!(!hook_path.exists());
+    }
+
+    #[test]
+    fn init_fails_without_git_repo_when_hooks_enabled() {
+        let temp_dir = TempDir::new().unwrap();
+        // No git repo setup
+
+        let args = InitArgs {
+            working_dir: Some(temp_dir.path().to_path_buf()),
+            ..Default::default()
+        };
+        let result = run(args);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Not a git repository")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn init_makes_hook_executable() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        setup_git_repo(&temp_dir);
+
+        let args = InitArgs {
+            working_dir: Some(temp_dir.path().to_path_buf()),
+            ..Default::default()
+        };
+        run(args).unwrap();
+
+        let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
+        let perms = fs::metadata(&hook_path).unwrap().permissions();
+        assert_eq!(perms.mode() & 0o755, 0o755);
+    }
+
+    #[test]
+    fn init_does_not_overwrite_existing_foreign_hook() {
+        let temp_dir = TempDir::new().unwrap();
+        setup_git_repo(&temp_dir);
+
+        // Create a foreign hook
+        let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
+        fs::write(&hook_path, "#!/bin/sh\necho 'custom hook'").unwrap();
+
+        let args = InitArgs {
+            working_dir: Some(temp_dir.path().to_path_buf()),
+            ..Default::default()
+        };
+        run(args).unwrap();
+
+        // Verify hook was NOT overwritten
+        let content = fs::read_to_string(&hook_path).unwrap();
+        assert!(content.contains("custom hook"));
+        assert!(!content.contains(PAVER_HOOK_MARKER));
+    }
+
+    #[test]
+    fn init_does_not_reinstall_paver_hook() {
+        let temp_dir = TempDir::new().unwrap();
+        setup_git_repo(&temp_dir);
+
+        // First init
+        let args = InitArgs {
+            force: true, // Use force to allow re-init
+            working_dir: Some(temp_dir.path().to_path_buf()),
+            ..Default::default()
+        };
+        run(args).unwrap();
+
+        let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
+        let first_content = fs::read_to_string(&hook_path).unwrap();
+
+        // Second init should succeed without error (paver hook already installed)
+        let args = InitArgs {
+            force: true,
+            working_dir: Some(temp_dir.path().to_path_buf()),
+            ..Default::default()
+        };
+        run(args).unwrap();
+
+        // Hook should still exist with same content
+        let second_content = fs::read_to_string(&hook_path).unwrap();
+        assert_eq!(first_content, second_content);
     }
 }
