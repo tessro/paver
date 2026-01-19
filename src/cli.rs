@@ -85,8 +85,16 @@ pub enum Command {
     #[command(subcommand)]
     Config(ConfigCommand),
 
-    /// Generate an index document
-    Index,
+    /// Generate an index document mapping all PAVED documentation
+    Index {
+        /// Where to write the index document
+        #[arg(short, long, default_value = "docs/index.md")]
+        output: PathBuf,
+
+        /// Update existing index (preserve custom content)
+        #[arg(short, long)]
+        update: bool,
+    },
 }
 
 #[derive(Subcommand)]

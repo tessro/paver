@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use paver::cli::{Cli, Command, ConfigCommand, DocType, PromptOutputFormat};
 use paver::commands::config;
+use paver::commands::index;
 use paver::commands::new::{self, NewArgs};
 use paver::commands::prompt::{generate_prompt, OutputFormat, PromptOptions};
 use paver::templates::TemplateType;
@@ -72,8 +73,8 @@ fn main() -> Result<()> {
                 config::path()?;
             }
         },
-        Command::Index => {
-            println!("paver index: not yet implemented");
+        Command::Index { output, update } => {
+            index::run(&output, update)?;
         }
     }
 
