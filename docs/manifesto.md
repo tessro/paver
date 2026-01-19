@@ -105,7 +105,7 @@ pave new component auth-service
 
 Creates `docs/auth-service.md`:
 
-```markdown
+````markdown
 # Auth Service
 
 ## Purpose
@@ -128,21 +128,21 @@ Creates `docs/auth-service.md`:
 
 ## Decisions
 <!-- Why does this design exist? What must not change? -->
-```
+````
 
 ### Before and after: Converting prose to PAVED
 
 **Before** (traditional docs):
-```markdown
+````markdown
 # Background Jobs
 
 Our background job system handles scheduled tasks. It uses Redis
 for the queue and runs workers on each server. Jobs retry 3 times
 before failing. You can check the dashboard at /admin/jobs.
-```
+````
 
 **After** (PAVED format):
-```markdown
+````markdown
 # Background Jobs
 
 ## Purpose
@@ -170,7 +170,7 @@ BackgroundJob.perform_later(user_id: 123)
 ## Decisions
 - 3 retries before failure (balances reliability vs. queue throughput)
 - Redis over Postgres (lower latency for high-frequency jobs)
-```
+````
 
 ### Failure case: Document too long
 

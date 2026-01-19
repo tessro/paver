@@ -15,13 +15,13 @@ Code mapping links documentation to source code files via the `## Paths` section
 
 Add a `## Paths` section to any PAVED document listing the code files it covers:
 
-```markdown
+````markdown
 ## Paths
 
 - `src/auth.rs`
 - `src/auth/*.rs`
 - `src/middleware/session.rs`
-```
+````
 
 Patterns support:
 - Exact paths: `src/auth.rs`
@@ -106,7 +106,7 @@ Verify JSON output format works:
 
 Map a component doc to its implementation files:
 
-```markdown
+````markdown
 # Auth Service
 
 ## Purpose
@@ -119,19 +119,19 @@ Handles user authentication and session management.
 - `src/middleware/session.rs`
 
 ...rest of doc...
-```
+````
 
 ### Using Glob Patterns
 
 Match multiple files with wildcards:
 
-```markdown
+````markdown
 ## Paths
 
 - `src/commands/*.rs`      # All command implementations
 - `src/**/*_test.rs`       # All test files
 - `config/*.toml`          # Configuration files
-```
+````
 
 ### CI Integration
 

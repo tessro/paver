@@ -15,7 +15,7 @@ The verification system extracts and executes commands from the `## Verification
 
 Commands in the Verification section are extracted from fenced code blocks with shell language hints (`bash`, `sh`, `shell`, `console`):
 
-```markdown
+````markdown
 ## Verification
 
 Run the tests:
@@ -27,13 +27,13 @@ Check the build:
 ```sh
 cargo build --release
 ```
-```
+````
 
 ### Shell Prompts
 
 Commands can optionally include shell prompts (`$` or `>`), which are stripped before execution:
 
-```markdown
+````markdown
 ## Verification
 ```bash
 $ pave --version
@@ -42,15 +42,15 @@ $ pave --version
 $ pave check
 # Expected: exits 0 if all docs pass
 ```
-```
+````
 
 Multiple commands on separate lines are joined with `&&`:
-```markdown
+````markdown
 ```bash
 $ cargo build
 $ cargo test
 ```
-```
+````
 Executes as: `cargo build && cargo test`
 
 ### Exit Codes
@@ -109,7 +109,7 @@ Verification is enabled when:
 
 A component document with verification:
 
-```markdown
+````markdown
 # Auth Service
 
 ## Purpose
@@ -126,13 +126,13 @@ cargo test auth
 
 ## Examples
 ...
-```
+````
 
 ### Multiple Code Blocks
 
 Each code block runs independently:
 
-```markdown
+````markdown
 ## Verification
 
 Test the API:
@@ -144,13 +144,13 @@ Test the database layer:
 ```bash
 cargo test db
 ```
-```
+````
 
 ### Using Comments for Documentation
 
 Comments (lines starting with `#`) are skipped:
 
-```markdown
+````markdown
 ## Verification
 ```bash
 # Build the project first
@@ -159,7 +159,7 @@ cargo build
 # Then run tests
 cargo test
 ```
-```
+````
 
 This executes: `cargo build && cargo test`
 
@@ -176,7 +176,7 @@ The `--keep-going` flag ensures all documents are verified even if some fail, gi
 ### Writing Effective Verification Commands
 
 **Good:** Quick, focused checks
-```markdown
+````markdown
 ## Verification
 ```bash
 # Check version
@@ -185,17 +185,17 @@ pave --version
 # Validate docs pass
 pave check docs/
 ```
-```
+````
 
 **Bad:** Long-running or flaky commands
-```markdown
+````markdown
 ## Verification
 ```bash
 # Don't do this - takes too long
 cargo build --all-targets
 npm run test:e2e
 ```
-```
+````
 
 ## Verification
 

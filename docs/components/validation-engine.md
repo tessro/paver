@@ -113,7 +113,7 @@ cargo test parser && cargo test rules
 
 A minimal document that passes validation:
 
-```markdown
+````markdown
 # My Component
 
 ## Purpose
@@ -125,20 +125,20 @@ $ cargo test
 
 ## Examples
 Basic usage:
-\`\`\`rust
+```rust
 let auth = Auth::new();
-\`\`\`
 ```
+````
 
 ### Invalid Document
 
 A document missing required sections will fail:
 
-```markdown
+````markdown
 # Missing Sections
 
 Just some text without proper sections.
-```
+````
 
 Error output:
 ```
