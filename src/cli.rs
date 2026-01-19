@@ -12,6 +12,27 @@ pub struct Cli {
     pub command: Command,
 }
 
+/// Document type for PAVED documentation.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum DocType {
+    /// Component documentation for services, libraries, and modules.
+    Component,
+    /// Runbook for operational procedures.
+    Runbook,
+    /// Architecture Decision Record.
+    Adr,
+}
+
+/// Output format for prompt command.
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+pub enum PromptOutputFormat {
+    /// Plain text output.
+    #[default]
+    Text,
+    /// JSON output for programmatic use.
+    Json,
+}
+
 #[derive(Subcommand)]
 pub enum Command {
     /// Initialize a project with PAVED documentation
@@ -35,7 +56,27 @@ pub enum Command {
     },
 
     /// Generate prompts for AI agents
-    Prompt,
+    Prompt {
+        /// Document type: component, runbook, adr
+        #[arg(value_enum)]
+        doc_type: DocType,
+
+        /// Name of the thing being documented
+        #[arg(long = "for")]
+        name: Option<String>,
+
+        /// Generate prompt to update existing doc
+        #[arg(long)]
+        update: Option<PathBuf>,
+
+        /// Include these files as context (can be specified multiple times)
+        #[arg(long, value_name = "PATH")]
+        context: Vec<PathBuf>,
+
+        /// Output format: text, json
+        #[arg(long, value_enum, default_value = "text")]
+        output: PromptOutputFormat,
+    },
 
     /// Manage git hooks for documentation validation
     Hooks,
@@ -69,17 +110,6 @@ pub enum ConfigCommand {
 
     /// Print path to config file
     Path,
-}
-
-/// Document type for the `paver new` command.
-#[derive(Debug, Clone, Copy, ValueEnum)]
-pub enum DocType {
-    /// Component documentation for services, libraries, and modules
-    Component,
-    /// Runbook for operational procedures
-    Runbook,
-    /// Architecture Decision Record
-    Adr,
 }
 
 impl From<DocType> for TemplateType {

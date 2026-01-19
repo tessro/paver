@@ -1,8 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
-use paver::cli::{Cli, Command, ConfigCommand};
+use paver::cli::{Cli, Command, ConfigCommand, DocType, PromptOutputFormat};
 use paver::commands::config;
 use paver::commands::new::{self, NewArgs};
+use paver::commands::prompt::{generate_prompt, OutputFormat, PromptOptions};
+use paver::templates::TemplateType;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -25,8 +27,33 @@ fn main() -> Result<()> {
                 output,
             })?;
         }
-        Command::Prompt => {
-            println!("paver prompt: not yet implemented");
+        Command::Prompt {
+            doc_type,
+            name,
+            update,
+            context,
+            output,
+        } => {
+            let options = PromptOptions {
+                doc_type: match doc_type {
+                    DocType::Component => TemplateType::Component,
+                    DocType::Runbook => TemplateType::Runbook,
+                    DocType::Adr => TemplateType::Adr,
+                },
+                name,
+                update_path: update.map(|p| p.to_string_lossy().to_string()),
+                context_paths: context
+                    .into_iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect(),
+                output_format: match output {
+                    PromptOutputFormat::Text => OutputFormat::Text,
+                    PromptOutputFormat::Json => OutputFormat::Json,
+                },
+            };
+
+            let prompt = generate_prompt(&options)?;
+            print!("{}", prompt);
         }
         Command::Hooks => {
             println!("paver hooks: not yet implemented");
