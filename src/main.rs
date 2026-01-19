@@ -7,6 +7,7 @@ use paver::commands::adopt::{self, AdoptArgs};
 use paver::commands::build;
 use paver::commands::changed::{self, ChangedArgs};
 use paver::commands::check::{self, CheckArgs};
+use paver::commands::coverage::{self, CoverageArgs};
 use paver::commands::config;
 use paver::commands::hooks;
 use paver::commands::index;
@@ -160,6 +161,21 @@ fn main() -> Result<()> {
         }
         Command::Build { output } => {
             build::execute(build::BuildArgs { output })?;
+        }
+        Command::Coverage {
+            path,
+            format,
+            threshold,
+            include,
+            exclude,
+        } => {
+            coverage::execute(CoverageArgs {
+                path,
+                format,
+                threshold,
+                include,
+                exclude,
+            })?;
         }
     }
 

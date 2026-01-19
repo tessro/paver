@@ -190,11 +190,44 @@ pub enum Command {
         #[arg(short, long, default_value = "_site")]
         output: PathBuf,
     },
+
+    /// Show code-to-documentation coverage
+    Coverage {
+        /// Path to analyze [default: project root]
+        #[arg()]
+        path: Option<PathBuf>,
+
+        /// Output format: text, json
+        #[arg(long, default_value = "text", value_enum)]
+        format: CoverageOutputFormat,
+
+        /// Fail if coverage below this percentage
+        #[arg(long)]
+        threshold: Option<u32>,
+
+        /// Only consider these code patterns (can be specified multiple times)
+        #[arg(long = "include", value_name = "PATTERN")]
+        include: Vec<String>,
+
+        /// Exclude these code patterns (can be specified multiple times)
+        #[arg(long = "exclude", value_name = "PATTERN")]
+        exclude: Vec<String>,
+    },
 }
 
 /// Output format for the `paver changed` command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
 pub enum ChangedOutputFormat {
+    /// Human-readable text output
+    #[default]
+    Text,
+    /// JSON output for programmatic use
+    Json,
+}
+
+/// Output format for the `paver coverage` command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum CoverageOutputFormat {
     /// Human-readable text output
     #[default]
     Text,

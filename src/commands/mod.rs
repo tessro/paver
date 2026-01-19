@@ -5,6 +5,7 @@ pub mod build;
 pub mod changed;
 pub mod check;
 pub mod config;
+pub mod coverage;
 pub mod hooks;
 pub mod index;
 pub mod init;
