@@ -1,230 +1,210 @@
-**tess:**
+# PAVED Framework
 
-what's the meta for software documentation in the ai agent era? a framework that's easy for agents to author within, is there such a thing?
+## Purpose
 
----
-**ChatGPT 5.2 Thinking:**
+PAVED is a documentation framework optimized for human+agent pairs doing software engineering work. It structures documentation as precise interfaces rather than prose, making docs easy for agents to author, maintain, and verify.
 
-Yeah — there is a “meta” emerging, and it’s basically:
+**Non-goals:**
+- Replacing narrative documentation entirely
+- Requiring every file to follow PAVED format
+- Supporting documentation outside software engineering contexts
 
-Docs aren’t for humans anymore; they’re for a human+agent pair doing work.
-Which means: small, structured, testable, and easy to update.
+## Interface
 
-Here’s a framework that works really well in practice and is very agent-authorable.
+The PAVED acronym defines five required elements for agent-native documentation:
 
-⸻
+| Section | Purpose | Key Content |
+|---------|---------|-------------|
+| **P**urpose | What is this? What problem does it solve? | 1-3 sentences + non-goals |
+| **A**PI/Interface | How do you use it? | Commands, endpoints, schemas, config keys |
+| **V**erification | How do you know it's working? | Test commands, health checks, expected outputs |
+| **E**xamples | Concrete, copy-paste usage | Happy path, realistic case, failure case |
+| **D**ecisions | Why this design? What must not change? | Rationale, constraints, tradeoffs |
 
-The new meta: “Docs as interfaces”
+### Document Types
 
-Treat documentation like you treat APIs:
-	•	Precise contracts
-	•	Small surfaces
-	•	Versioned
-	•	Validated
-	•	Optimized for retrieval + execution
+PAVED supports three document types, each with specific sections:
 
-Agents don’t need prose. They need ground truth, constraints, examples, and how to verify.
+**Component docs** (`component.md`):
+- Purpose, Interface, Configuration, Verification, Examples, Gotchas, Decisions
 
-⸻
+**Runbooks** (`runbook_<task>.md`):
+- When to use, Preconditions, Steps, Rollback, Verification, Escalation
 
-A doc framework that agents can author: PAVED
+**ADRs** (`adr_<title>.md`):
+- Context, Decision, Consequences, Alternatives considered
 
-This is my go-to structure for “agent-native” docs:
+### CLI Commands
 
-1) P — Purpose
+| Command | Description |
+|---------|-------------|
+| `paver init` | Initialize PAVED documentation in a project |
+| `paver new <type> <name>` | Create a new document from template |
+| `paver check [paths]` | Validate documents against PAVED rules |
+| `paver prompt <path>` | Generate context for AI agents |
 
-What is this thing? What problem does it solve?
-	•	1–3 sentences
-	•	include non-goals
+## Configuration
 
-Example
+Configuration lives in `.paver.toml` at the project root:
 
-“This service runs scheduled background jobs. It does not do real-time event processing.”
+```toml
+[paver]
+version = "0.1"
 
-⸻
+[docs]
+root = "docs"
+templates = "docs/templates"
 
-2) A — API / Interface
+[rules]
+max_lines = 300
+require_verification = true
+require_examples = true
+```
 
-How do you use it? What are the entry points?
-	•	CLI commands
-	•	HTTP endpoints
-	•	library calls
-	•	config keys
-	•	file formats
+| Key | Default | Description |
+|-----|---------|-------------|
+| `docs.root` | `docs` | Root directory for documentation |
+| `docs.templates` | `docs/templates` | Template directory |
+| `rules.max_lines` | `300` | Maximum lines per document |
+| `rules.require_verification` | `true` | Require Verification section |
+| `rules.require_examples` | `true` | Require Examples section |
 
-Agents thrive on tables and schemas here.
+## Verification
 
-⸻
+Validate documents pass PAVED requirements:
 
-3) V — Verification
+```bash
+# Check all docs
+paver check
 
-How do you know it’s working?
+# Check specific file
+paver check docs/manifesto.md
 
-This is the #1 missing thing in most docs, and it’s everything for agents.
+# Check with strict mode (warnings become errors)
+paver check --strict
 
-Include:
-	•	“golden” commands
-	•	expected output snippets
-	•	healthcheck endpoints
-	•	invariants
-	•	how to run tests
-	•	“common failure → diagnosis”
+# JSON output for CI integration
+paver check --format json
+```
 
-⸻
+Expected output for a valid document:
+```
+Checked 1 document: all checks passed
+```
 
-4) E — Examples
+Common validation errors:
+```
+docs/example.md:1: error: Missing required section 'Verification'
+  hint: Add a '## Verification' section with test commands
+```
 
-Concrete copy/paste examples, ideally minimal:
-	•	1 happy path
-	•	1 realistic path
-	•	1 failure path
+## Examples
 
-Agents use examples as “shape matching” to produce correct output.
+### Creating a new component doc
 
-⸻
+```bash
+paver new component auth-service
+```
 
-5) D — Decisions
+Creates `docs/auth-service.md`:
 
-Short rationale + constraints:
-	•	why this design exists
-	•	what must not change
-	•	tradeoffs
+```markdown
+# Auth Service
 
-This prevents agents from “refactoring your intent away.”
+## Purpose
+<!-- What is this? What problem does it solve? 1-3 sentences. -->
 
-⸻
+## Interface
+<!-- How do you use it? Entry points, commands, schemas. -->
 
-The authoring meta: “Leaf docs” + “Index docs”
+## Configuration
+<!-- Config keys, environment variables, file formats. -->
 
-Agents do best when docs are:
+## Verification
+<!-- How do you know it's working? -->
 
-Leaf docs (small + atomic)
-	•	one concept
-	•	one workflow
-	•	one component
-	•	one decision
+## Examples
+<!-- Concrete, copy-paste examples. -->
 
-Index docs (routing + map)
-	•	“Start here”
-	•	links to leaf docs
-	•	a 30-second mental model
+## Gotchas
+<!-- Common pitfalls and how to avoid them. -->
 
-This mirrors how agents retrieve: they want a map, then a target chunk.
+## Decisions
+<!-- Why does this design exist? What must not change? -->
+```
 
-⸻
+### Before and after: Converting prose to PAVED
 
-The formatting meta: “Docs that compile”
+**Before** (traditional docs):
+```markdown
+# Background Jobs
 
-If you want agents to reliably author and maintain docs, make the format lintable:
+Our background job system handles scheduled tasks. It uses Redis
+for the queue and runs workers on each server. Jobs retry 3 times
+before failing. You can check the dashboard at /admin/jobs.
+```
 
-Recommended structure per doc file
-	•	frontmatter / metadata (optional)
-	•	sections with stable headings
-	•	bulleted constraints
-	•	code blocks that run
+**After** (PAVED format):
+```markdown
+# Background Jobs
 
-Add doc quality gates
-	•	“Every doc must include Verification”
-	•	“Every public module must have one Example”
-	•	“No doc > 300 lines; split instead”
-	•	“Every example has expected output”
+## Purpose
+Handles scheduled background tasks using Redis-backed queues.
 
-Agents can follow rules like these extremely well.
+**Non-goals:** Real-time event processing, cron job scheduling.
 
-⸻
+## Interface
+- Queue: Redis `jobs:*` keys
+- Dashboard: `/admin/jobs`
+- CLI: `rake jobs:work`, `rake jobs:clear`
 
-The best agent-friendly doc types (in priority order)
+## Verification
+```bash
+# Check worker status
+curl localhost:3000/admin/jobs/health
+# Expected: {"status":"ok","workers":4}
+```
 
-1) Runbooks
+## Examples
+```ruby
+BackgroundJob.perform_later(user_id: 123)
+```
 
-“Do X safely.”
+## Decisions
+- 3 retries before failure (balances reliability vs. queue throughput)
+- Redis over Postgres (lower latency for high-frequency jobs)
+```
 
-Great because they’re procedural and verifiable.
+### Failure case: Document too long
 
-2) Golden paths
+```bash
+$ paver check docs/monolith.md
+docs/monolith.md:350: warning: Document exceeds 300 line limit (350 lines)
+  hint: Consider splitting into smaller, focused documents
 
-“How we do this here.”
+Checked 1 document: 0 errors, 1 warning
+```
 
-Great because they constrain choices.
+## Gotchas
 
-3) Contracts / Schemas
+**Agents don't need prose.** They need ground truth, constraints, examples, and verification steps. Avoid narrative explanations.
 
-OpenAPI / protobuf / JSON schema / config schema.
+**Keep docs small.** The 300-line limit exists because agents retrieve docs as context. Large docs waste context window and reduce accuracy.
 
-Agents are shockingly good when you give them structure.
+**Examples must be runnable.** If an example requires setup not shown, the agent will produce broken code. Show complete, working examples.
 
-4) Decision records (ADRs)
+**Verification is everything.** Without verification steps, agents hallucinate correctness. Every doc needs a way to prove it's right.
 
-Short and high-signal.
+**Don't nest docs.** Prefer flat structure over deep hierarchies. Agents retrieve docs individually, not as trees.
 
-⸻
+## Decisions
 
-What to avoid (old meta)
+**Structure over prose.** Traditional docs optimize for human reading. PAVED optimizes for agent retrieval and action. Tables and code blocks beat paragraphs.
 
-These fail in agent workflows:
-	•	big narrative docs (“Architecture Overview” that’s 20 pages)
-	•	“tribal knowledge” prose
-	•	docs without verification steps
-	•	docs that describe outcomes but not constraints
-	•	docs that require reading 10 other docs first
+**Small, atomic docs.** "Leaf docs" cover one concept, one workflow, one component. "Index docs" provide routing. This mirrors how agents retrieve: map first, then target chunk.
 
-⸻
+**Verification is required.** The #1 missing element in traditional docs. Without it, agents can't self-correct.
 
-The killer trick: “Make docs executable”
+**Max 300 lines.** Forces splitting, which improves retrieval accuracy. A focused doc beats a comprehensive one.
 
-If you do only one thing, do this:
-
-Put commands in docs that actually run
-	•	make test
-	•	make lint
-	•	make smoke
-	•	./scripts/verify_<thing>.sh
-	•	curl localhost:…
-
-Agents can:
-	•	propose changes
-	•	then validate them
-	•	then update docs
-
-Without verification hooks, they hallucinate correctness.
-
-⸻
-
-A concrete template you can standardize on
-
-component.md
-	•	Purpose
-	•	Interface
-	•	Configuration
-	•	Verification
-	•	Examples
-	•	Gotchas
-	•	Decisions / invariants
-
-runbook_<task>.md
-	•	When to use this
-	•	Preconditions
-	•	Steps
-	•	Rollback
-	•	Verification
-	•	Escalation
-
-adr_<title>.md
-	•	Context
-	•	Decision
-	•	Consequences
-	•	Alternatives considered
-
-This is “agent-easy” because it’s repetitive and checklisted.
-
-⸻
-
-If you want one sentence to pin on the wall
-
-Write docs like you’re training a careful junior engineer who can run commands but can’t read minds.
-
-That’s basically the AI agent era.
-
-⸻
-
-If you want, I can turn this into a drop-in repo standard: folder layout + templates + a doc-lint checklist that agents can follow (and that humans won’t hate).
+**Three document types.** Components (what), runbooks (how), ADRs (why). Covers 90% of engineering documentation needs without complexity.
