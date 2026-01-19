@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use paver::cli::{Cli, Command, ConfigCommand, DocType, PromptOutputFormat};
+use paver::commands::check::{self, CheckArgs};
 use paver::commands::config;
 use paver::commands::index;
 use paver::commands::init;
@@ -20,8 +21,16 @@ fn main() -> Result<()> {
                 working_dir: None,
             })?;
         }
-        Command::Check => {
-            println!("paver check: not yet implemented");
+        Command::Check {
+            paths,
+            format,
+            strict,
+        } => {
+            check::execute(CheckArgs {
+                paths,
+                format,
+                strict,
+            })?;
         }
         Command::New {
             doc_type,

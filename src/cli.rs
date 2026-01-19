@@ -39,7 +39,19 @@ pub enum Command {
     Init(InitArgs),
 
     /// Validate PAVED documentation
-    Check,
+    Check {
+        /// Specific files or directories to check [default: docs root from config]
+        #[arg()]
+        paths: Vec<PathBuf>,
+
+        /// Output format: text, json, github
+        #[arg(long, default_value = "text", value_enum)]
+        format: OutputFormat,
+
+        /// Treat warnings as errors
+        #[arg(long)]
+        strict: bool,
+    },
 
     /// Create a new document from template
     New {
@@ -118,6 +130,18 @@ pub enum ConfigCommand {
 
     /// Print path to config file
     Path,
+}
+
+/// Output format for the `paver check` command.
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+pub enum OutputFormat {
+    /// Human-readable text output
+    #[default]
+    Text,
+    /// JSON output for programmatic use
+    Json,
+    /// GitHub Actions annotation format
+    Github,
 }
 
 impl From<DocType> for TemplateType {
