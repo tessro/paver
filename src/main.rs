@@ -9,6 +9,7 @@ use paver::commands::index;
 use paver::commands::init;
 use paver::commands::new::{self, NewArgs};
 use paver::commands::prompt::{OutputFormat, PromptOptions, generate_prompt};
+use paver::commands::build;
 use paver::commands::verify::{self, VerifyArgs};
 use paver::templates::TemplateType;
 
@@ -137,6 +138,9 @@ fn main() -> Result<()> {
                 timeout,
                 keep_going,
             })?;
+        }
+        Command::Build { output } => {
+            build::execute(build::BuildArgs { output })?;
         }
     }
 

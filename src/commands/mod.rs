@@ -1,5 +1,6 @@
 //! Command implementations for paver CLI.
 
+pub mod build;
 pub mod changed;
 pub mod check;
 pub mod config;

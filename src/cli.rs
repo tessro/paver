@@ -154,6 +154,13 @@ pub enum Command {
         #[arg(long)]
         keep_going: bool,
     },
+
+    /// Build static documentation site
+    Build {
+        /// Output directory for the built site
+        #[arg(short, long, default_value = "_site")]
+        output: PathBuf,
+    },
 }
 
 /// Output format for the `paver changed` command.
