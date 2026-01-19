@@ -51,6 +51,14 @@ pub enum Command {
         /// Treat warnings as errors
         #[arg(long)]
         strict: bool,
+
+        /// Only check docs changed since base ref
+        #[arg(long)]
+        changed: bool,
+
+        /// Base ref for --changed comparison [default: origin/main]
+        #[arg(long)]
+        base: Option<String>,
     },
 
     /// Create a new document from template

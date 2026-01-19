@@ -2,8 +2,10 @@
 
 use anyhow::{Context, Result};
 use serde::Serialize;
+use std::collections::HashSet;
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use crate::cli::OutputFormat;
 use crate::config::{CONFIG_FILENAME, PaverConfig};
@@ -17,6 +19,10 @@ pub struct CheckArgs {
     pub format: OutputFormat,
     /// Treat warnings as errors.
     pub strict: bool,
+    /// Only check docs changed since base ref.
+    pub changed: bool,
+    /// Base ref for --changed comparison.
+    pub base: Option<String>,
 }
 
 /// Severity of a validation issue.
@@ -85,18 +91,36 @@ pub fn execute(args: CheckArgs) -> Result<()> {
     // Find and load config
     let config_path = find_config()?;
     let config = PaverConfig::load(&config_path)?;
+    let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
     // Determine paths to check
     let paths = if args.paths.is_empty() {
         // Use docs root from config, relative to config file location
-        let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
         vec![config_dir.join(&config.docs.root)]
     } else {
         args.paths.clone()
     };
 
     // Find all markdown files
-    let files = find_markdown_files(&paths)?;
+    let mut files = find_markdown_files(&paths)?;
+
+    // Filter to only changed files if --changed flag is set
+    if args.changed {
+        let base_ref = determine_base_ref(args.base.as_deref())?;
+        let changed_files = get_changed_md_files(&base_ref, config_dir)?;
+
+        if changed_files.is_empty() {
+            eprintln!("No changed markdown files found compared to {}", base_ref);
+            return Ok(());
+        }
+
+        // Filter files to only include those that changed
+        files.retain(|f| {
+            // Normalize path for comparison
+            let relative = f.strip_prefix(config_dir).unwrap_or(f).to_path_buf();
+            changed_files.contains(&relative) || changed_files.contains(f)
+        });
+    }
 
     if files.is_empty() {
         eprintln!("No markdown files found to check");
@@ -158,6 +182,74 @@ fn find_config() -> Result<PathBuf> {
             ),
         }
     }
+}
+
+/// Determine the base ref to compare against.
+fn determine_base_ref(explicit_base: Option<&str>) -> Result<String> {
+    if let Some(base) = explicit_base {
+        return Ok(base.to_string());
+    }
+
+    // Try origin/main first
+    if ref_exists("origin/main") {
+        return Ok("origin/main".to_string());
+    }
+
+    // Try origin/master
+    if ref_exists("origin/master") {
+        return Ok("origin/master".to_string());
+    }
+
+    // Fall back to HEAD~1
+    Ok("HEAD~1".to_string())
+}
+
+/// Check if a git ref exists.
+fn ref_exists(ref_name: &str) -> bool {
+    Command::new("git")
+        .args(["rev-parse", "--verify", "--quiet", ref_name])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+/// Get the list of changed markdown files from git diff.
+fn get_changed_md_files(base_ref: &str, config_dir: &Path) -> Result<HashSet<PathBuf>> {
+    let output = Command::new("git")
+        .args(["diff", "--name-only", &format!("{}..HEAD", base_ref)])
+        .current_dir(config_dir)
+        .output()
+        .context("Failed to run git diff")?;
+
+    if !output.status.success() {
+        // Try without ..HEAD for cases like HEAD~1
+        let output = Command::new("git")
+            .args(["diff", "--name-only", base_ref])
+            .current_dir(config_dir)
+            .output()
+            .context("Failed to run git diff")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("git diff failed: {}", stderr);
+        }
+
+        return parse_changed_md_files(&output.stdout);
+    }
+
+    parse_changed_md_files(&output.stdout)
+}
+
+/// Parse git diff --name-only output into a set of markdown file paths.
+fn parse_changed_md_files(output: &[u8]) -> Result<HashSet<PathBuf>> {
+    let stdout = String::from_utf8_lossy(output);
+    let files: HashSet<PathBuf> = stdout
+        .lines()
+        .filter(|line| !line.is_empty())
+        .filter(|line| line.ends_with(".md"))
+        .map(PathBuf::from)
+        .collect();
+    Ok(files)
 }
 
 /// Find all markdown files in the given paths.
@@ -569,5 +661,39 @@ This document is missing required sections.
         // Template files should be skipped - no errors reported
         assert!(results.errors.is_empty());
         assert!(results.warnings.is_empty());
+    }
+
+    #[test]
+    fn parse_changed_md_files_filters_to_markdown() {
+        let output = b"src/cli.rs\ndocs/readme.md\nsrc/main.rs\ndocs/guide.md\n";
+        let files = parse_changed_md_files(output).unwrap();
+
+        assert_eq!(files.len(), 2);
+        assert!(files.contains(&PathBuf::from("docs/readme.md")));
+        assert!(files.contains(&PathBuf::from("docs/guide.md")));
+    }
+
+    #[test]
+    fn parse_changed_md_files_empty_output() {
+        let output = b"";
+        let files = parse_changed_md_files(output).unwrap();
+        assert!(files.is_empty());
+
+        let output = b"\n\n";
+        let files = parse_changed_md_files(output).unwrap();
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn parse_changed_md_files_no_markdown() {
+        let output = b"src/cli.rs\nsrc/main.rs\nCargo.toml\n";
+        let files = parse_changed_md_files(output).unwrap();
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn determine_base_ref_uses_explicit() {
+        let result = determine_base_ref(Some("custom-branch")).unwrap();
+        assert_eq!(result, "custom-branch");
     }
 }

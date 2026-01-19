@@ -264,10 +264,7 @@ fn parse_doc_mapping(path: &Path, config_dir: &Path) -> Result<Option<DocMapping
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read file: {}", path.display()))?;
 
-    let relative_path = path
-        .strip_prefix(config_dir)
-        .unwrap_or(path)
-        .to_path_buf();
+    let relative_path = path.strip_prefix(config_dir).unwrap_or(path).to_path_buf();
 
     let title = extract_title(&content);
     let patterns = extract_paths_patterns(&content);
@@ -356,18 +353,14 @@ fn find_impacted_docs(
             // Check if the doc itself was updated
             let doc_full_path = config_dir.join(&doc.doc_path);
             let doc_relative = doc_full_path
-                .strip_prefix(
-                    std::env::current_dir()
-                        .unwrap_or_else(|_| PathBuf::from(".")),
-                )
+                .strip_prefix(std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
                 .unwrap_or(&doc.doc_path);
 
             let was_updated = changed_files.contains(&doc.doc_path)
                 || changed_files.contains(doc_relative)
-                || changed_files.iter().any(|f| {
-                    f.ends_with(&doc.doc_path)
-                        || doc.doc_path.ends_with(f)
-                });
+                || changed_files
+                    .iter()
+                    .any(|f| f.ends_with(&doc.doc_path) || doc.doc_path.ends_with(f));
 
             matched_files.sort();
             impacted.push(ImpactedDoc {
@@ -657,13 +650,23 @@ No paths section.
 
         assert_eq!(impacted.len(), 2);
 
-        let cli_doc = impacted.iter().find(|d| d.doc_path.to_string_lossy().contains("cli")).unwrap();
+        let cli_doc = impacted
+            .iter()
+            .find(|d| d.doc_path.to_string_lossy().contains("cli"))
+            .unwrap();
         assert_eq!(cli_doc.matched_files.len(), 1);
         assert!(cli_doc.matched_files.contains(&PathBuf::from("src/cli.rs")));
 
-        let cmd_doc = impacted.iter().find(|d| d.doc_path.to_string_lossy().contains("commands")).unwrap();
+        let cmd_doc = impacted
+            .iter()
+            .find(|d| d.doc_path.to_string_lossy().contains("commands"))
+            .unwrap();
         assert_eq!(cmd_doc.matched_files.len(), 1);
-        assert!(cmd_doc.matched_files.contains(&PathBuf::from("src/commands/check.rs")));
+        assert!(
+            cmd_doc
+                .matched_files
+                .contains(&PathBuf::from("src/commands/check.rs"))
+        );
     }
 
     #[test]
@@ -738,9 +741,6 @@ No paths section.
 
         // Should only include the doc with paths, not the one without or index.md
         assert_eq!(mappings.len(), 1);
-        assert!(mappings[0]
-            .doc_path
-            .to_string_lossy()
-            .contains("component"));
+        assert!(mappings[0].doc_path.to_string_lossy().contains("component"));
     }
 }

@@ -27,11 +27,15 @@ fn main() -> Result<()> {
             paths,
             format,
             strict,
+            changed,
+            base,
         } => {
             check::execute(CheckArgs {
                 paths,
                 format,
                 strict,
+                changed,
+                base,
             })?;
         }
         Command::New {
