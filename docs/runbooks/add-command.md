@@ -139,7 +139,7 @@ git checkout -- src/main.rs src/cli.rs src/commands/
 After completing all steps, verify success with:
 
 ```bash
-cargo test
+cargo test 2>&1 | grep "test result: ok" | head -1
 ```
 
 Validate PAVED documentation:

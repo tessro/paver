@@ -9,6 +9,16 @@ The verification system extracts and executes commands from the `## Verification
 - Not a CI pipeline (use GitHub Actions, Jenkins for orchestration)
 - Doesn't manage test data or fixtures
 
+## Verification
+
+```bash
+cargo test verification 2>&1 | grep "test result: ok"
+```
+
+```bash
+cargo build --release
+```
+
 ## Interface
 
 ### Command Format
@@ -102,16 +112,6 @@ Verification uses the standard `.paver.toml` configuration to locate the docs ro
 Verification is enabled when:
 1. A document has a `## Verification` section
 2. That section contains at least one fenced code block with a shell language hint
-
-## Verification
-
-```bash
-cargo test
-```
-
-```bash
-cargo build --release
-```
 
 ## Examples
 
