@@ -12,8 +12,20 @@
 <!-- Config keys, environment variables, file formats. -->
 
 ## Verification
-<!-- How do you know it's working? -->
-<!-- Include: test commands, health checks, expected outputs. -->
+<!-- How do you know it's working? Include test commands with expected output. -->
+<!-- Commands in bash blocks are executable via `paver verify`. -->
+
+Run the unit tests:
+```bash
+$ cargo test
+test result: ok
+```
+
+Check the health endpoint:
+```bash
+$ curl -s http://localhost:8080/health
+{"status":"healthy"}
+```
 
 ## Examples
 <!-- Concrete, copy-paste examples. -->
