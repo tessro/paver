@@ -10,7 +10,7 @@ use crate::templates::{TemplateType, get_template};
 fn default_config(docs_root: &str) -> String {
     format!(
         r#"# Paver configuration file
-# See https://github.com/anthropics/paver for documentation
+# See https://github.com/tessro/paver for documentation
 
 [docs]
 # Root directory for documentation
