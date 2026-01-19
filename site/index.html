@@ -1,0 +1,90 @@
+---
+layout: default
+title: Home
+---
+
+<section class="hero">
+  <span class="hero-emoji">🛤️</span>
+  <h1>paver</h1>
+  <p class="hero-tagline">Documentation for the AI agent era. Structured, verifiable, and ready to be consumed by your robot overlords. 🤖</p>
+  <div>
+    <a href="{{ '/docs/' | relative_url }}" class="btn">Read the Docs</a>
+    <a href="https://github.com/anthropics/paver" class="btn btn-secondary">View on GitHub</a>
+  </div>
+</section>
+
+<h2>What is PAVED? 🧱</h2>
+
+<p>PAVED is a documentation framework designed for the human+agent workflow. When AI agents need to understand, author, and maintain documentation, prose isn't enough. They need <strong>ground truth, constraints, examples, and verification</strong>.</p>
+
+<div class="card-grid">
+  <div class="card">
+    <h3><span class="paved-letter">P</span> Purpose</h3>
+    <p>What is this thing? What problem does it solve? 1-3 sentences. Include non-goals. Agents need to know boundaries. 🎯</p>
+  </div>
+
+  <div class="card">
+    <h3><span class="paved-letter">A</span> API / Interface</h3>
+    <p>How do you use it? CLI commands, HTTP endpoints, config keys. Agents thrive on tables and schemas. 📡</p>
+  </div>
+
+  <div class="card">
+    <h3><span class="paved-letter">V</span> Verification</h3>
+    <p>How do you know it's working? Golden commands, expected outputs, healthchecks. Without verification, agents hallucinate correctness. ✅</p>
+  </div>
+
+  <div class="card">
+    <h3><span class="paved-letter">E</span> Examples</h3>
+    <p>Concrete copy-paste examples. Happy path, realistic path, failure path. Agents use examples as shape matching. 📋</p>
+  </div>
+
+  <div class="card">
+    <h3><span class="paved-letter">D</span> Decisions</h3>
+    <p>Why this design? What must not change? Tradeoffs. This prevents agents from refactoring your intent away. 🔒</p>
+  </div>
+</div>
+
+<h2>Why paver? 🚀</h2>
+
+<blockquote>
+  <p>"Write docs like you're training a careful junior engineer who can run commands but can't read minds."</p>
+</blockquote>
+
+<div class="card">
+  <h3>📁 Structured Templates</h3>
+  <p>Scaffold new documentation with <code>paver new</code>. Components, runbooks, ADRs - all with the right sections already in place.</p>
+</div>
+
+<div class="card">
+  <h3>🤖 Agent-Native Prompts</h3>
+  <p>Generate AI agent prompts with <code>paver prompt</code>. Your project's rules, templates, and context - packaged for LLMs.</p>
+</div>
+
+<div class="card">
+  <h3>🗺️ Auto-Generated Index</h3>
+  <p>Keep your docs navigable with <code>paver index</code>. Automatically scans, categorizes, and creates a doc map.</p>
+</div>
+
+<div class="card">
+  <h3>✅ Validation Rules</h3>
+  <p>Enforce doc quality with <code>paver check</code>. Max lines, required sections, verification steps - all configurable.</p>
+</div>
+
+<h2>Quick Start ⚡</h2>
+
+<pre><code># Initialize paver in your project
+paver init
+
+# Create a new component doc
+paver new component my-service
+
+# Generate an index of all docs
+paver index
+
+# Validate your documentation
+paver check
+</code></pre>
+
+<p style="text-align: center; margin-top: 3rem;">
+  <a href="{{ '/docs/getting-started/' | relative_url }}" class="btn">Get Started</a>
+</p>
