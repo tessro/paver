@@ -5,7 +5,7 @@ use paver::commands::config;
 use paver::commands::index;
 use paver::commands::init;
 use paver::commands::new::{self, NewArgs};
-use paver::commands::prompt::{generate_prompt, OutputFormat, PromptOptions};
+use paver::commands::prompt::{OutputFormat, PromptOptions, generate_prompt};
 use paver::templates::TemplateType;
 
 fn main() -> Result<()> {

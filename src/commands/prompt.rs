@@ -7,8 +7,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::config::{PaverConfig, RulesSection, CONFIG_FILENAME};
-use crate::templates::{get_template, TemplateType};
+use crate::config::{CONFIG_FILENAME, PaverConfig, RulesSection};
+use crate::templates::{TemplateType, get_template};
 
 /// Output format for the generated prompt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
