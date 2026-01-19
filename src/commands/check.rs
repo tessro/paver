@@ -10,6 +10,7 @@ use std::process::Command;
 use crate::cli::OutputFormat;
 use crate::config::{CONFIG_FILENAME, PaverConfig};
 use crate::parser::ParsedDoc;
+use crate::rules::{RulesEngine, detect_doc_type, get_type_specific_rules};
 
 /// Arguments for the `paver check` command.
 pub struct CheckArgs {
@@ -294,8 +295,6 @@ fn collect_markdown_files_recursive(dir: &Path, files: &mut Vec<PathBuf>) -> Res
 
 /// Check a single file against the validation rules.
 fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> Result<()> {
-    let doc = ParsedDoc::parse(path)?;
-
     // Skip validation of index.md files - they are navigation documents
     // that don't need Verification and Examples sections
     if path.file_name().is_some_and(|f| f == "index.md") {
@@ -307,6 +306,11 @@ fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> 
     if path_str.contains("/templates/") || path_str.contains("\\templates\\") {
         return Ok(());
     }
+
+    // Read file content once for parsing and type detection
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read file: {}", path.display()))?;
+    let doc = ParsedDoc::parse_content(path.to_path_buf(), &content)?;
 
     // Check max lines
     if doc.line_count > config.rules.max_lines as usize {
@@ -342,6 +346,35 @@ fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> 
             message: "Missing required section 'Examples'".to_string(),
             hint: Some("Add an '## Examples' section with concrete usage examples".to_string()),
         });
+    }
+
+    // Apply document-type-specific validation rules
+    let doc_type = detect_doc_type(path, &content);
+    let type_rules = get_type_specific_rules(doc_type, &config.rules);
+
+    if !type_rules.is_empty() {
+        let engine = RulesEngine::new(type_rules);
+        let validation_result = engine.validate(&doc);
+
+        for error in validation_result.errors {
+            results.add_issue(Issue {
+                file: path.to_path_buf(),
+                line: error.line.unwrap_or(1),
+                severity: Severity::Error,
+                message: error.message,
+                hint: error.suggestion,
+            });
+        }
+
+        for warning in validation_result.warnings {
+            results.add_issue(Issue {
+                file: path.to_path_buf(),
+                line: warning.line.unwrap_or(1),
+                severity: Severity::Warning,
+                message: warning.message,
+                hint: None,
+            });
+        }
     }
 
     Ok(())
@@ -695,5 +728,399 @@ This document is missing required sections.
     fn determine_base_ref_uses_explicit() {
         let result = determine_base_ref(Some("custom-branch")).unwrap();
         assert_eq!(result, "custom-branch");
+    }
+
+    fn create_test_config_with_type_rules(temp_dir: &TempDir) -> PathBuf {
+        let config_content = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+
+[rules]
+max_lines = 300
+require_verification = true
+require_examples = true
+
+[rules.type_specific]
+runbooks = true
+adrs = true
+components = true
+"#;
+        let config_path = temp_dir.path().join(".paver.toml");
+        fs::write(&config_path, config_content).unwrap();
+        config_path
+    }
+
+    #[test]
+    fn check_runbook_missing_required_sections() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_type_rules(&temp_dir);
+        let runbooks_dir = temp_dir.path().join("docs").join("runbooks");
+        fs::create_dir_all(&runbooks_dir).unwrap();
+
+        let content = r#"# Runbook: Deploy
+
+## Purpose
+How to deploy.
+
+## Verification
+```bash
+$ echo "ok"
+```
+
+## Examples
+```bash
+$ deploy.sh
+```
+"#;
+        let doc_path = runbooks_dir.join("deploy.md");
+        fs::write(&doc_path, content).unwrap();
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        // Should fail because missing When to Use, Steps, Rollback
+        assert!(!results.errors.is_empty());
+        assert!(
+            results
+                .errors
+                .iter()
+                .any(|e| e.message.contains("When to Use"))
+        );
+        assert!(results.errors.iter().any(|e| e.message.contains("Steps")));
+        assert!(
+            results
+                .errors
+                .iter()
+                .any(|e| e.message.contains("Rollback"))
+        );
+    }
+
+    #[test]
+    fn check_complete_runbook_passes() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_type_rules(&temp_dir);
+        let runbooks_dir = temp_dir.path().join("docs").join("runbooks");
+        fs::create_dir_all(&runbooks_dir).unwrap();
+
+        let content = r#"# Runbook: Deploy
+
+## Purpose
+How to deploy.
+
+## When to Use
+When deploying the application.
+
+## Steps
+1. Build the app
+2. Deploy
+
+## Rollback
+Revert the deployment.
+
+## Verification
+```bash
+$ echo "ok"
+```
+
+## Examples
+```bash
+$ deploy.sh
+```
+"#;
+        let doc_path = runbooks_dir.join("deploy.md");
+        fs::write(&doc_path, content).unwrap();
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        assert!(results.errors.is_empty(), "errors: {:?}", results.errors);
+    }
+
+    #[test]
+    fn check_adr_missing_required_sections() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_type_rules(&temp_dir);
+        let adr_dir = temp_dir.path().join("docs").join("adr");
+        fs::create_dir_all(&adr_dir).unwrap();
+
+        let content = r#"# ADR: Use Rust
+
+## Purpose
+We decided to use Rust.
+
+## Verification
+```bash
+$ cargo --version
+```
+
+## Examples
+```rust
+fn main() {}
+```
+"#;
+        let doc_path = adr_dir.join("001-use-rust.md");
+        fs::write(&doc_path, content).unwrap();
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        // Should fail because missing Status, Context, Decision, Consequences
+        assert!(!results.errors.is_empty());
+        assert!(results.errors.iter().any(|e| e.message.contains("Status")));
+        assert!(results.errors.iter().any(|e| e.message.contains("Context")));
+        assert!(
+            results
+                .errors
+                .iter()
+                .any(|e| e.message.contains("Decision"))
+        );
+        assert!(
+            results
+                .errors
+                .iter()
+                .any(|e| e.message.contains("Consequences"))
+        );
+    }
+
+    #[test]
+    fn check_complete_adr_passes() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_type_rules(&temp_dir);
+        let adr_dir = temp_dir.path().join("docs").join("adr");
+        fs::create_dir_all(&adr_dir).unwrap();
+
+        let content = r#"# ADR: Use Rust
+
+## Purpose
+We decided to use Rust.
+
+## Status
+Accepted
+
+## Context
+We need a systems language.
+
+## Decision
+We chose Rust.
+
+## Consequences
+Better safety.
+
+## Verification
+```bash
+$ cargo --version
+```
+
+## Examples
+```rust
+fn main() {}
+```
+"#;
+        let doc_path = adr_dir.join("001-use-rust.md");
+        fs::write(&doc_path, content).unwrap();
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        assert!(results.errors.is_empty(), "errors: {:?}", results.errors);
+    }
+
+    #[test]
+    fn check_adr_invalid_status() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_type_rules(&temp_dir);
+        let adr_dir = temp_dir.path().join("docs").join("adr");
+        fs::create_dir_all(&adr_dir).unwrap();
+
+        let content = r#"# ADR: Use Rust
+
+## Purpose
+We decided to use Rust.
+
+## Status
+Unknown
+
+## Context
+We need a systems language.
+
+## Decision
+We chose Rust.
+
+## Consequences
+Better safety.
+
+## Verification
+```bash
+$ cargo --version
+```
+
+## Examples
+```rust
+fn main() {}
+```
+"#;
+        let doc_path = adr_dir.join("001-use-rust.md");
+        fs::write(&doc_path, content).unwrap();
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        // Should fail because of invalid status
+        assert!(
+            results
+                .errors
+                .iter()
+                .any(|e| e.message.contains("valid status"))
+        );
+    }
+
+    #[test]
+    fn check_component_missing_interface_and_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_type_rules(&temp_dir);
+        let components_dir = temp_dir.path().join("docs").join("components");
+        fs::create_dir_all(&components_dir).unwrap();
+
+        let content = r#"# Auth Component
+
+## Purpose
+Handles authentication.
+
+## Verification
+```bash
+$ cargo test
+```
+
+## Examples
+```rust
+fn main() {}
+```
+"#;
+        let doc_path = components_dir.join("auth.md");
+        fs::write(&doc_path, content).unwrap();
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        // Should fail because missing Interface OR Configuration
+        assert!(
+            results
+                .errors
+                .iter()
+                .any(|e| e.message.contains("Interface"))
+        );
+    }
+
+    #[test]
+    fn check_component_with_interface_passes() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_type_rules(&temp_dir);
+        let components_dir = temp_dir.path().join("docs").join("components");
+        fs::create_dir_all(&components_dir).unwrap();
+
+        let content = r#"# Auth Component
+
+## Purpose
+Handles authentication.
+
+## Interface
+The API endpoints.
+
+## Verification
+```bash
+$ cargo test
+```
+
+## Examples
+```rust
+fn main() {}
+```
+"#;
+        let doc_path = components_dir.join("auth.md");
+        fs::write(&doc_path, content).unwrap();
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        assert!(results.errors.is_empty(), "errors: {:?}", results.errors);
+    }
+
+    #[test]
+    fn check_component_with_configuration_passes() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_type_rules(&temp_dir);
+        let components_dir = temp_dir.path().join("docs").join("components");
+        fs::create_dir_all(&components_dir).unwrap();
+
+        let content = r#"# Auth Component
+
+## Purpose
+Handles authentication.
+
+## Configuration
+The config options.
+
+## Verification
+```bash
+$ cargo test
+```
+
+## Examples
+```rust
+fn main() {}
+```
+"#;
+        let doc_path = components_dir.join("auth.md");
+        fs::write(&doc_path, content).unwrap();
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        assert!(results.errors.is_empty(), "errors: {:?}", results.errors);
+    }
+
+    #[test]
+    fn check_generic_doc_no_type_specific_rules() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_type_rules(&temp_dir);
+        let docs_dir = temp_dir.path().join("docs");
+        fs::create_dir_all(&docs_dir).unwrap();
+
+        // A generic doc that doesn't match any specific type
+        let content = r#"# General Guide
+
+## Purpose
+A general guide.
+
+## Verification
+```bash
+$ echo "ok"
+```
+
+## Examples
+```bash
+$ run.sh
+```
+"#;
+        let doc_path = docs_dir.join("guide.md");
+        fs::write(&doc_path, content).unwrap();
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        // Should pass - generic docs don't need type-specific sections
+        assert!(results.errors.is_empty(), "errors: {:?}", results.errors);
     }
 }

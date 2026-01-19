@@ -388,6 +388,7 @@ mod tests {
             require_examples: true,
             require_verification_commands: true,
             strict_output_matching: false,
+            type_specific: Default::default(),
         };
 
         let formatted = format_rules(&rules);

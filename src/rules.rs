@@ -3,10 +3,19 @@
 //! This module provides a rules engine that validates parsed PAVED documents
 //! against configurable rules from `.paver.toml`.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::RulesSection;
 use crate::parser::ParsedDoc;
+
+/// Document type for type-specific validation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocType {
+    Component,
+    Runbook,
+    Adr,
+    Other,
+}
 
 /// A rule that can be applied to validate a PAVED document.
 #[derive(Debug, Clone, PartialEq)]
@@ -19,6 +28,10 @@ pub enum Rule {
     RequireCodeBlock { in_section: String },
     /// Require a runnable command in a specific section.
     RequireCommand { in_section: String },
+    /// Require at least one of the listed sections to be present.
+    RequireOneOf { sections: Vec<String> },
+    /// Require a section to contain a valid ADR status value.
+    RequireValidAdrStatus,
 }
 
 impl Rule {
@@ -33,9 +46,17 @@ impl Rule {
             Rule::RequireCommand { in_section } => {
                 format!("require-command-in-{}", in_section.to_lowercase())
             }
+            Rule::RequireOneOf { sections } => {
+                let names: Vec<_> = sections.iter().map(|s| s.to_lowercase()).collect();
+                format!("require-one-of-{}", names.join("-or-"))
+            }
+            Rule::RequireValidAdrStatus => "require-valid-adr-status".to_string(),
         }
     }
 }
+
+/// Valid ADR status values.
+const VALID_ADR_STATUSES: &[&str] = &["proposed", "accepted", "deprecated", "superseded"];
 
 /// A validation error found in a document.
 #[derive(Debug, Clone, PartialEq)]
@@ -243,6 +264,44 @@ impl RulesEngine {
                     });
                 }
             }
+            Rule::RequireOneOf { sections } => {
+                let has_any = sections.iter().any(|name| doc.has_section(name));
+                if !has_any {
+                    let section_list = sections.join("' or '");
+                    result.errors.push(ValidationError {
+                        rule: rule.name(),
+                        message: format!(
+                            "missing required section: must have '{}' section",
+                            section_list
+                        ),
+                        line: None,
+                        suggestion: Some(format!(
+                            "add a '## {}' section to the document",
+                            sections.first().unwrap_or(&String::new())
+                        )),
+                    });
+                }
+            }
+            Rule::RequireValidAdrStatus => {
+                if let Some(section) = doc.get_section("Status") {
+                    let content_lower = section.content.to_lowercase();
+                    let has_valid_status = VALID_ADR_STATUSES
+                        .iter()
+                        .any(|status| content_lower.contains(status));
+                    if !has_valid_status {
+                        result.errors.push(ValidationError {
+                            rule: rule.name(),
+                            message: "ADR Status section must contain a valid status value"
+                                .to_string(),
+                            line: Some(section.start_line),
+                            suggestion: Some(
+                                "set status to one of: Proposed, Accepted, Deprecated, Superseded"
+                                    .to_string(),
+                            ),
+                        });
+                    }
+                }
+            }
         }
     }
 
@@ -250,6 +309,117 @@ impl RulesEngine {
     pub fn rules(&self) -> &[Rule] {
         &self.rules
     }
+
+    /// Validates a document against all rules, including type-specific rules.
+    pub fn validate_with_type(
+        &self,
+        doc: &ParsedDoc,
+        doc_type: DocType,
+        config: &RulesSection,
+    ) -> ValidationResult {
+        let mut result = ValidationResult::new(&doc.path);
+
+        // Apply base rules
+        for rule in &self.rules {
+            self.apply_rule(rule, doc, &mut result);
+        }
+
+        // Apply type-specific rules based on config and detected type
+        let type_rules = get_type_specific_rules(doc_type, config);
+        for rule in &type_rules {
+            self.apply_rule(rule, doc, &mut result);
+        }
+
+        result
+    }
+}
+
+/// Detects the document type from path and content.
+pub fn detect_doc_type(path: &Path, content: &str) -> DocType {
+    let path_str = path.to_string_lossy().to_lowercase();
+
+    // Check path patterns
+    if path_str.contains("component") {
+        return DocType::Component;
+    }
+    if path_str.contains("runbook") {
+        return DocType::Runbook;
+    }
+    if path_str.contains("adr") || path_str.contains("decision") {
+        return DocType::Adr;
+    }
+
+    // Check content patterns
+    let content_lower = content.to_lowercase();
+
+    // ADRs typically have a Status section
+    if content_lower.contains("## status")
+        && (content_lower.contains("accepted")
+            || content_lower.contains("proposed")
+            || content_lower.contains("deprecated"))
+    {
+        return DocType::Adr;
+    }
+
+    // Runbooks have specific sections
+    if content_lower.contains("## when to use")
+        || content_lower.contains("## preconditions")
+        || content_lower.contains("## steps")
+    {
+        return DocType::Runbook;
+    }
+
+    // Components have Interface/Configuration sections
+    if content_lower.contains("## interface") || content_lower.contains("## configuration") {
+        return DocType::Component;
+    }
+
+    DocType::Other
+}
+
+/// Returns the type-specific rules for a given document type.
+pub fn get_type_specific_rules(doc_type: DocType, config: &RulesSection) -> Vec<Rule> {
+    let mut rules = Vec::new();
+
+    match doc_type {
+        DocType::Runbook if config.type_specific.runbooks => {
+            // Runbooks require: When to Use, Steps, Rollback, Verification
+            rules.push(Rule::RequireSection {
+                name: "When to Use".to_string(),
+            });
+            rules.push(Rule::RequireSection {
+                name: "Steps".to_string(),
+            });
+            rules.push(Rule::RequireSection {
+                name: "Rollback".to_string(),
+            });
+        }
+        DocType::Adr if config.type_specific.adrs => {
+            // ADRs require: Status (with valid value), Context, Decision, Consequences
+            rules.push(Rule::RequireSection {
+                name: "Status".to_string(),
+            });
+            rules.push(Rule::RequireValidAdrStatus);
+            rules.push(Rule::RequireSection {
+                name: "Context".to_string(),
+            });
+            rules.push(Rule::RequireSection {
+                name: "Decision".to_string(),
+            });
+            rules.push(Rule::RequireSection {
+                name: "Consequences".to_string(),
+            });
+        }
+        DocType::Component if config.type_specific.components => {
+            // Components require: Interface OR Configuration (at least one)
+            rules.push(Rule::RequireOneOf {
+                sections: vec!["Interface".to_string(), "Configuration".to_string()],
+            });
+        }
+        _ => {}
+    }
+
+    rules
 }
 
 #[cfg(test)]
@@ -379,6 +549,7 @@ Missing verification.
             require_examples: false,
             require_verification_commands: true,
             strict_output_matching: false,
+            type_specific: Default::default(),
         };
         let engine = RulesEngine::from_config(&config);
 
@@ -533,6 +704,357 @@ Just some text, no commands here.
                 .errors
                 .iter()
                 .any(|e| e.message.contains("runnable command"))
+        );
+    }
+
+    #[test]
+    fn require_one_of_passes_with_first_section() {
+        let content = r#"# Component
+
+## Purpose
+A test component.
+
+## Interface
+The API interface.
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::RequireOneOf {
+            sections: vec!["Interface".to_string(), "Configuration".to_string()],
+        }]);
+        let result = engine.validate(&doc);
+        assert!(result.is_valid());
+    }
+
+    #[test]
+    fn require_one_of_passes_with_second_section() {
+        let content = r#"# Component
+
+## Purpose
+A test component.
+
+## Configuration
+The configuration options.
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::RequireOneOf {
+            sections: vec!["Interface".to_string(), "Configuration".to_string()],
+        }]);
+        let result = engine.validate(&doc);
+        assert!(result.is_valid());
+    }
+
+    #[test]
+    fn require_one_of_fails_without_any_section() {
+        let content = r#"# Component
+
+## Purpose
+A test component without interface or config.
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::RequireOneOf {
+            sections: vec!["Interface".to_string(), "Configuration".to_string()],
+        }]);
+        let result = engine.validate(&doc);
+        assert!(!result.is_valid());
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.message.contains("Interface"))
+        );
+    }
+
+    #[test]
+    fn require_valid_adr_status_passes_with_accepted() {
+        let content = r#"# ADR: Test Decision
+
+## Status
+Accepted
+
+## Purpose
+A test ADR.
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::RequireValidAdrStatus]);
+        let result = engine.validate(&doc);
+        assert!(result.is_valid());
+    }
+
+    #[test]
+    fn require_valid_adr_status_passes_with_proposed() {
+        let content = r#"# ADR: Test Decision
+
+## Status
+Proposed
+
+## Purpose
+A test ADR.
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::RequireValidAdrStatus]);
+        let result = engine.validate(&doc);
+        assert!(result.is_valid());
+    }
+
+    #[test]
+    fn require_valid_adr_status_fails_with_invalid_status() {
+        let content = r#"# ADR: Test Decision
+
+## Status
+Unknown
+
+## Purpose
+A test ADR.
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::RequireValidAdrStatus]);
+        let result = engine.validate(&doc);
+        assert!(!result.is_valid());
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.message.contains("valid status"))
+        );
+    }
+
+    #[test]
+    fn detect_doc_type_from_path_component() {
+        let path = PathBuf::from("docs/components/auth.md");
+        assert_eq!(detect_doc_type(&path, ""), DocType::Component);
+    }
+
+    #[test]
+    fn detect_doc_type_from_path_runbook() {
+        let path = PathBuf::from("docs/runbooks/deploy.md");
+        assert_eq!(detect_doc_type(&path, ""), DocType::Runbook);
+    }
+
+    #[test]
+    fn detect_doc_type_from_path_adr() {
+        let path = PathBuf::from("docs/adr/001-use-rust.md");
+        assert_eq!(detect_doc_type(&path, ""), DocType::Adr);
+    }
+
+    #[test]
+    fn detect_doc_type_from_content_adr() {
+        let path = PathBuf::from("docs/decisions/001.md");
+        assert_eq!(detect_doc_type(&path, ""), DocType::Adr);
+
+        let path = PathBuf::from("docs/other.md");
+        let content = "## Status\nAccepted\n\n## Context\nSome context.";
+        assert_eq!(detect_doc_type(&path, content), DocType::Adr);
+    }
+
+    #[test]
+    fn detect_doc_type_from_content_runbook() {
+        let path = PathBuf::from("docs/ops/deploy.md");
+        let content = "## When to Use\nWhen deploying.";
+        assert_eq!(detect_doc_type(&path, content), DocType::Runbook);
+
+        let content = "## Steps\n1. First step.";
+        assert_eq!(detect_doc_type(&path, content), DocType::Runbook);
+    }
+
+    #[test]
+    fn detect_doc_type_from_content_component() {
+        let path = PathBuf::from("docs/services/auth.md");
+        let content = "## Interface\nThe API.";
+        assert_eq!(detect_doc_type(&path, content), DocType::Component);
+
+        let content = "## Configuration\nConfig options.";
+        assert_eq!(detect_doc_type(&path, content), DocType::Component);
+    }
+
+    #[test]
+    fn detect_doc_type_other() {
+        let path = PathBuf::from("docs/misc/readme.md");
+        assert_eq!(
+            detect_doc_type(&path, "## Purpose\nJust a doc."),
+            DocType::Other
+        );
+    }
+
+    #[test]
+    fn get_type_specific_rules_runbook() {
+        let config = RulesSection {
+            type_specific: crate::config::TypeSpecificRulesSection {
+                runbooks: true,
+                adrs: false,
+                components: false,
+            },
+            ..Default::default()
+        };
+        let rules = get_type_specific_rules(DocType::Runbook, &config);
+        assert_eq!(rules.len(), 3); // When to Use, Steps, Rollback
+        assert!(rules.iter().any(|r| matches!(
+            r,
+            Rule::RequireSection { name } if name == "When to Use"
+        )));
+        assert!(rules.iter().any(|r| matches!(
+            r,
+            Rule::RequireSection { name } if name == "Steps"
+        )));
+        assert!(rules.iter().any(|r| matches!(
+            r,
+            Rule::RequireSection { name } if name == "Rollback"
+        )));
+    }
+
+    #[test]
+    fn get_type_specific_rules_adr() {
+        let config = RulesSection {
+            type_specific: crate::config::TypeSpecificRulesSection {
+                runbooks: false,
+                adrs: true,
+                components: false,
+            },
+            ..Default::default()
+        };
+        let rules = get_type_specific_rules(DocType::Adr, &config);
+        assert_eq!(rules.len(), 5); // Status, RequireValidAdrStatus, Context, Decision, Consequences
+        assert!(rules.iter().any(|r| matches!(
+            r,
+            Rule::RequireSection { name } if name == "Status"
+        )));
+        assert!(
+            rules
+                .iter()
+                .any(|r| matches!(r, Rule::RequireValidAdrStatus))
+        );
+        assert!(rules.iter().any(|r| matches!(
+            r,
+            Rule::RequireSection { name } if name == "Context"
+        )));
+        assert!(rules.iter().any(|r| matches!(
+            r,
+            Rule::RequireSection { name } if name == "Decision"
+        )));
+        assert!(rules.iter().any(|r| matches!(
+            r,
+            Rule::RequireSection { name } if name == "Consequences"
+        )));
+    }
+
+    #[test]
+    fn get_type_specific_rules_component() {
+        let config = RulesSection {
+            type_specific: crate::config::TypeSpecificRulesSection {
+                runbooks: false,
+                adrs: false,
+                components: true,
+            },
+            ..Default::default()
+        };
+        let rules = get_type_specific_rules(DocType::Component, &config);
+        assert_eq!(rules.len(), 1); // RequireOneOf Interface/Configuration
+        assert!(
+            matches!(&rules[0], Rule::RequireOneOf { sections } if sections.contains(&"Interface".to_string()))
+        );
+    }
+
+    #[test]
+    fn get_type_specific_rules_disabled() {
+        let config = RulesSection::default(); // All type-specific rules disabled
+        assert!(get_type_specific_rules(DocType::Runbook, &config).is_empty());
+        assert!(get_type_specific_rules(DocType::Adr, &config).is_empty());
+        assert!(get_type_specific_rules(DocType::Component, &config).is_empty());
+        assert!(get_type_specific_rules(DocType::Other, &config).is_empty());
+    }
+
+    #[test]
+    fn validate_with_type_applies_type_specific_rules() {
+        let content = r#"# Runbook: Deploy
+
+## Purpose
+How to deploy.
+
+## Verification
+```bash
+$ echo "deployed"
+```
+
+## Examples
+```bash
+$ deploy.sh
+```
+"#;
+        let doc = parse_doc(content);
+        let config = RulesSection {
+            type_specific: crate::config::TypeSpecificRulesSection {
+                runbooks: true,
+                adrs: false,
+                components: false,
+            },
+            ..Default::default()
+        };
+        let engine = RulesEngine::from_config(&config);
+        let result = engine.validate_with_type(&doc, DocType::Runbook, &config);
+
+        // Should fail because missing When to Use, Steps, Rollback
+        assert!(!result.is_valid());
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.message.contains("When to Use"))
+        );
+        assert!(result.errors.iter().any(|e| e.message.contains("Steps")));
+        assert!(result.errors.iter().any(|e| e.message.contains("Rollback")));
+    }
+
+    #[test]
+    fn validate_with_type_passes_complete_runbook() {
+        let content = r#"# Runbook: Deploy
+
+## Purpose
+How to deploy.
+
+## When to Use
+When deploying.
+
+## Steps
+1. Run deploy.
+
+## Rollback
+Revert the deploy.
+
+## Verification
+```bash
+$ echo "deployed"
+```
+
+## Examples
+```bash
+$ deploy.sh
+```
+"#;
+        let doc = parse_doc(content);
+        let config = RulesSection {
+            type_specific: crate::config::TypeSpecificRulesSection {
+                runbooks: true,
+                adrs: false,
+                components: false,
+            },
+            ..Default::default()
+        };
+        let engine = RulesEngine::from_config(&config);
+        let result = engine.validate_with_type(&doc, DocType::Runbook, &config);
+        assert!(result.is_valid(), "errors: {:?}", result.errors);
+    }
+
+    #[test]
+    fn rule_names_for_new_rules() {
+        assert_eq!(
+            Rule::RequireOneOf {
+                sections: vec!["Interface".to_string(), "Configuration".to_string()]
+            }
+            .name(),
+            "require-one-of-interface-or-configuration"
+        );
+        assert_eq!(
+            Rule::RequireValidAdrStatus.name(),
+            "require-valid-adr-status"
         );
     }
 }

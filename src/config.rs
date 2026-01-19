@@ -68,6 +68,24 @@ pub struct RulesSection {
     /// When false (default), output matching is advisory only.
     #[serde(default)]
     pub strict_output_matching: bool,
+    /// Enable document-type-specific validation rules.
+    /// When enabled, documents are validated against type-specific requirements.
+    #[serde(default)]
+    pub type_specific: TypeSpecificRulesSection,
+}
+
+/// Document-type-specific validation rules.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct TypeSpecificRulesSection {
+    /// Enable validation of runbook-specific sections.
+    #[serde(default)]
+    pub runbooks: bool,
+    /// Enable validation of ADR-specific sections.
+    #[serde(default)]
+    pub adrs: bool,
+    /// Enable validation of component-specific sections.
+    #[serde(default)]
+    pub components: bool,
 }
 
 /// Template file mappings section.
@@ -133,6 +151,7 @@ impl Default for RulesSection {
             require_examples: true,
             require_verification_commands: true,
             strict_output_matching: false,
+            type_specific: TypeSpecificRulesSection::default(),
         }
     }
 }
@@ -441,5 +460,50 @@ root = "docs"
 "#;
         let config = PaverConfig::parse(toml).unwrap();
         assert!(!config.rules.strict_output_matching);
+    }
+
+    #[test]
+    fn parse_config_with_type_specific_rules() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+
+[rules.type_specific]
+runbooks = true
+adrs = true
+components = true
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(config.rules.type_specific.runbooks);
+        assert!(config.rules.type_specific.adrs);
+        assert!(config.rules.type_specific.components);
+    }
+
+    #[test]
+    fn default_type_specific_rules_are_disabled() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(!config.rules.type_specific.runbooks);
+        assert!(!config.rules.type_specific.adrs);
+        assert!(!config.rules.type_specific.components);
+    }
+
+    #[test]
+    fn config_roundtrip_with_type_specific_rules() {
+        let mut config = PaverConfig::default();
+        config.rules.type_specific.runbooks = true;
+        config.rules.type_specific.adrs = true;
+        let serialized = toml::to_string_pretty(&config).unwrap();
+        let deserialized = PaverConfig::parse(&serialized).unwrap();
+        assert_eq!(config, deserialized);
     }
 }
