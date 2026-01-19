@@ -232,6 +232,10 @@ pub enum HooksCommand {
         /// Overwrite existing hooks
         #[arg(long)]
         force: bool,
+
+        /// Also run paver verify in the hook
+        #[arg(long)]
+        verify: bool,
     },
 
     /// Uninstall git hooks

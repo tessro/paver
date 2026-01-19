@@ -26,6 +26,9 @@ pub struct PaverConfig {
     /// Code-to-documentation mapping configuration.
     #[serde(default)]
     pub mapping: MappingSection,
+    /// Git hooks configuration.
+    #[serde(default)]
+    pub hooks: HooksSection,
 }
 
 /// Paver tool metadata section.
@@ -79,6 +82,14 @@ pub struct MappingSection {
     /// Global path patterns to exclude from mapping.
     #[serde(default)]
     pub exclude: Vec<String>,
+}
+
+/// Git hooks configuration section.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct HooksSection {
+    /// Run paver verify in hooks (default: false).
+    #[serde(default)]
+    pub run_verify: bool,
 }
 
 fn default_max_lines() -> u32 {
@@ -350,6 +361,44 @@ root = "docs"
     fn config_roundtrip_with_mapping() {
         let mut config = PaverConfig::default();
         config.mapping.exclude = vec!["target/".to_string(), "*.tmp".to_string()];
+        let serialized = toml::to_string_pretty(&config).unwrap();
+        let deserialized = PaverConfig::parse(&serialized).unwrap();
+        assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn parse_config_with_hooks_section() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+
+[hooks]
+run_verify = true
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(config.hooks.run_verify);
+    }
+
+    #[test]
+    fn parse_config_without_hooks_uses_default() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(!config.hooks.run_verify);
+    }
+
+    #[test]
+    fn config_roundtrip_with_hooks() {
+        let mut config = PaverConfig::default();
+        config.hooks.run_verify = true;
         let serialized = toml::to_string_pretty(&config).unwrap();
         let deserialized = PaverConfig::parse(&serialized).unwrap();
         assert_eq!(config, deserialized);

@@ -131,7 +131,8 @@ pub fn run(args: InitArgs) -> Result<()> {
 fn install_git_hooks(base: &Path) -> Result<()> {
     // Use the shared hook installation from the hooks module
     // init_mode=true means: silently skip if paver hook exists, warn for foreign hooks
-    hooks::install_at(base, HookType::PreCommit, true)
+    // run_verify=false by default; users can enable via config or reinstall with --verify
+    hooks::install_at(base, HookType::PreCommit, true, false)
 }
 
 #[cfg(test)]

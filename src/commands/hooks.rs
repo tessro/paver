@@ -10,8 +10,22 @@ use crate::cli::HookType;
 pub const PAVER_HOOK_MARKER: &str = "# Installed by paver";
 
 /// Generate the hook script content for the given hook type.
-fn generate_hook_script(hook_type: HookType) -> String {
+///
+/// If `run_verify` is true, the hook will also run `paver verify --keep-going`
+/// after `paver check` passes.
+fn generate_hook_script(hook_type: HookType, run_verify: bool) -> String {
     let hook_name = hook_type.filename();
+    let verify_section = if run_verify {
+        r#"
+    echo ""
+    echo "Running PAVED verification..."
+    echo "$CHANGED_DOCS" | xargs paver verify --keep-going
+    exit $?
+"#
+    } else {
+        ""
+    };
+
     match hook_type {
         HookType::PreCommit => format!(
             r#"#!/bin/sh
@@ -27,7 +41,10 @@ CHANGED_DOCS=$(git diff --cached --name-only --diff-filter=ACM | grep "^$DOCS_RO
 if [ -n "$CHANGED_DOCS" ]; then
     echo "Validating PAVED documentation..."
     echo "$CHANGED_DOCS" | xargs paver check
-    exit $?
+    CHECK_STATUS=$?
+    if [ $CHECK_STATUS -ne 0 ]; then
+        exit $CHECK_STATUS
+    fi{verify_section}
 fi
 "#
         ),
@@ -58,7 +75,10 @@ while read local_ref local_sha remote_ref remote_sha; do
     if [ -n "$CHANGED_DOCS" ]; then
         echo "Validating PAVED documentation..."
         echo "$CHANGED_DOCS" | xargs paver check
-        exit $?
+        CHECK_STATUS=$?
+        if [ $CHECK_STATUS -ne 0 ]; then
+            exit $CHECK_STATUS
+        fi{verify_section}
     fi
 done
 
@@ -129,9 +149,12 @@ fn is_paver_hook(path: &Path) -> bool {
 }
 
 /// Install a git hook for documentation validation.
-pub fn install(hook_type: HookType, force: bool) -> Result<()> {
+///
+/// If `run_verify` is true, the hook will also run `paver verify --keep-going`
+/// after `paver check` passes.
+pub fn install(hook_type: HookType, force: bool, run_verify: bool) -> Result<()> {
     let hooks_dir = find_git_hooks_dir()?;
-    install_hook_in_dir(&hooks_dir, hook_type, force)
+    install_hook_in_dir(&hooks_dir, hook_type, force, run_verify)
 }
 
 /// Install a git hook at a specific base path (for use by init command).
@@ -139,7 +162,15 @@ pub fn install(hook_type: HookType, force: bool) -> Result<()> {
 /// Options for `init_mode`:
 /// - If `true` (init mode): silently skips if paver hook exists, warns for foreign hooks
 /// - If `false` (explicit install): follows normal install behavior with messages
-pub fn install_at(base: &Path, hook_type: HookType, init_mode: bool) -> Result<()> {
+///
+/// If `run_verify` is true, the hook will also run `paver verify --keep-going`
+/// after `paver check` passes.
+pub fn install_at(
+    base: &Path,
+    hook_type: HookType,
+    init_mode: bool,
+    run_verify: bool,
+) -> Result<()> {
     let hooks_dir = find_git_hooks_dir_from(base)?;
     let hook_path = hooks_dir.join(hook_type.filename());
 
@@ -165,7 +196,7 @@ pub fn install_at(base: &Path, hook_type: HookType, init_mode: bool) -> Result<(
         }
     }
 
-    let hook_content = generate_hook_script(hook_type);
+    let hook_content = generate_hook_script(hook_type, run_verify);
     fs::write(&hook_path, &hook_content)
         .with_context(|| format!("Failed to write {} hook", hook_type.filename()))?;
 
@@ -187,7 +218,12 @@ pub fn install_at(base: &Path, hook_type: HookType, init_mode: bool) -> Result<(
 }
 
 /// Internal function to install a hook in a specific hooks directory.
-fn install_hook_in_dir(hooks_dir: &Path, hook_type: HookType, force: bool) -> Result<()> {
+fn install_hook_in_dir(
+    hooks_dir: &Path,
+    hook_type: HookType,
+    force: bool,
+    run_verify: bool,
+) -> Result<()> {
     let hook_path = hooks_dir.join(hook_type.filename());
 
     // Check if hook already exists
@@ -208,7 +244,7 @@ fn install_hook_in_dir(hooks_dir: &Path, hook_type: HookType, force: bool) -> Re
         }
     }
 
-    let hook_content = generate_hook_script(hook_type);
+    let hook_content = generate_hook_script(hook_type, run_verify);
     fs::write(&hook_path, hook_content)
         .with_context(|| format!("Failed to write {} hook", hook_type.filename()))?;
 
@@ -292,7 +328,7 @@ mod tests {
         setup_git_repo(&temp_dir);
 
         with_working_dir(temp_dir.path(), || {
-            install(HookType::PreCommit, false).unwrap();
+            install(HookType::PreCommit, false, false).unwrap();
         });
 
         let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
@@ -309,7 +345,7 @@ mod tests {
         setup_git_repo(&temp_dir);
 
         with_working_dir(temp_dir.path(), || {
-            install(HookType::PrePush, false).unwrap();
+            install(HookType::PrePush, false, false).unwrap();
         });
 
         let hook_path = temp_dir.path().join(".git/hooks/pre-push");
@@ -325,7 +361,9 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         // No .git directory created
 
-        let result = with_working_dir(temp_dir.path(), || install(HookType::PreCommit, false));
+        let result = with_working_dir(temp_dir.path(), || {
+            install(HookType::PreCommit, false, false)
+        });
 
         assert!(result.is_err());
         assert!(
@@ -343,11 +381,13 @@ mod tests {
 
         // Install once
         with_working_dir(temp_dir.path(), || {
-            install(HookType::PreCommit, false).unwrap();
+            install(HookType::PreCommit, false, false).unwrap();
         });
 
         // Install again - should succeed with warning (not error)
-        let result = with_working_dir(temp_dir.path(), || install(HookType::PreCommit, false));
+        let result = with_working_dir(temp_dir.path(), || {
+            install(HookType::PreCommit, false, false)
+        });
         assert!(result.is_ok());
     }
 
@@ -360,7 +400,9 @@ mod tests {
         let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
         fs::write(&hook_path, "#!/bin/sh\necho 'custom hook'").unwrap();
 
-        let result = with_working_dir(temp_dir.path(), || install(HookType::PreCommit, false));
+        let result = with_working_dir(temp_dir.path(), || {
+            install(HookType::PreCommit, false, false)
+        });
 
         assert!(result.is_err());
         assert!(
@@ -381,7 +423,7 @@ mod tests {
         fs::write(&hook_path, "#!/bin/sh\necho 'custom hook'").unwrap();
 
         with_working_dir(temp_dir.path(), || {
-            install(HookType::PreCommit, true).unwrap();
+            install(HookType::PreCommit, true, false).unwrap();
         });
 
         let content = fs::read_to_string(&hook_path).unwrap();
@@ -395,7 +437,7 @@ mod tests {
 
         // Install first
         with_working_dir(temp_dir.path(), || {
-            install(HookType::PreCommit, false).unwrap();
+            install(HookType::PreCommit, false, false).unwrap();
         });
 
         let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
@@ -447,7 +489,7 @@ mod tests {
         setup_git_repo(&temp_dir);
 
         with_working_dir(temp_dir.path(), || {
-            install(HookType::PreCommit, false).unwrap();
+            install(HookType::PreCommit, false, false).unwrap();
         });
 
         let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
@@ -457,7 +499,7 @@ mod tests {
 
     #[test]
     fn generated_pre_commit_hook_uses_cached_diff() {
-        let script = generate_hook_script(HookType::PreCommit);
+        let script = generate_hook_script(HookType::PreCommit, false);
         assert!(script.contains("DOCS_ROOT=$(paver config get docs.root"));
         assert!(script.contains("git diff --cached"));
         assert!(script.contains("grep \"^$DOCS_ROOT/.*\\.md$\""));
@@ -465,7 +507,7 @@ mod tests {
 
     #[test]
     fn generated_pre_push_hook_uses_ref_diff() {
-        let script = generate_hook_script(HookType::PrePush);
+        let script = generate_hook_script(HookType::PrePush, false);
         assert!(script.contains("DOCS_ROOT=$(paver config get docs.root"));
         assert!(script.contains("while read local_ref local_sha"));
         assert!(script.contains("$remote_sha\"..\"$local_sha"));
@@ -492,7 +534,7 @@ mod tests {
         let main_repo = setup_git_worktree(&temp_dir);
 
         with_working_dir(temp_dir.path(), || {
-            install(HookType::PreCommit, false).unwrap();
+            install(HookType::PreCommit, false, false).unwrap();
         });
 
         // Hook should be in the worktree's git dir, not the main .git
@@ -512,7 +554,7 @@ mod tests {
 
         // Install first
         with_working_dir(temp_dir.path(), || {
-            install(HookType::PreCommit, false).unwrap();
+            install(HookType::PreCommit, false, false).unwrap();
         });
 
         let hook_path = main_repo
@@ -526,5 +568,42 @@ mod tests {
         });
 
         assert!(!hook_path.exists());
+    }
+
+    #[test]
+    fn generated_hook_without_verify_omits_verify() {
+        let script = generate_hook_script(HookType::PreCommit, false);
+        assert!(script.contains("paver check"));
+        assert!(!script.contains("paver verify"));
+    }
+
+    #[test]
+    fn generated_hook_with_verify_includes_verify() {
+        let script = generate_hook_script(HookType::PreCommit, true);
+        assert!(script.contains("paver check"));
+        assert!(script.contains("paver verify --keep-going"));
+        assert!(script.contains("Running PAVED verification"));
+    }
+
+    #[test]
+    fn generated_pre_push_hook_with_verify() {
+        let script = generate_hook_script(HookType::PrePush, true);
+        assert!(script.contains("paver check"));
+        assert!(script.contains("paver verify --keep-going"));
+    }
+
+    #[test]
+    fn install_with_verify_includes_verify_in_hook() {
+        let temp_dir = TempDir::new().unwrap();
+        setup_git_repo(&temp_dir);
+
+        with_working_dir(temp_dir.path(), || {
+            install(HookType::PreCommit, false, true).unwrap();
+        });
+
+        let hook_path = temp_dir.path().join(".git/hooks/pre-commit");
+        let content = fs::read_to_string(&hook_path).unwrap();
+        assert!(content.contains("paver check"));
+        assert!(content.contains("paver verify --keep-going"));
     }
 }

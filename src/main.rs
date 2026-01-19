@@ -79,8 +79,17 @@ fn main() -> Result<()> {
             print!("{}", prompt);
         }
         Command::Hooks(cmd) => match cmd {
-            HooksCommand::Install { hook, force } => {
-                hooks::install(hook, force)?;
+            HooksCommand::Install {
+                hook,
+                force,
+                verify,
+            } => {
+                // Use --verify flag if specified, otherwise check config
+                let run_verify = verify
+                    || paver::config::PaverConfig::load(paver::config::CONFIG_FILENAME)
+                        .map(|c| c.hooks.run_verify)
+                        .unwrap_or(false);
+                hooks::install(hook, force, run_verify)?;
             }
             HooksCommand::Uninstall { hook } => {
                 hooks::uninstall(hook)?;

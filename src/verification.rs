@@ -234,11 +234,9 @@ fn run_single_verification(item: &VerificationItem) -> VerificationResult {
                 None => true,
                 Some(OutputMatcher::ExitCodeOnly) => true,
                 Some(OutputMatcher::Contains(substring)) => stdout.contains(substring),
-                Some(OutputMatcher::Regex(pattern)) => {
-                    regex::Regex::new(pattern)
-                        .map(|re| re.is_match(&stdout))
-                        .unwrap_or(false)
-                }
+                Some(OutputMatcher::Regex(pattern)) => regex::Regex::new(pattern)
+                    .map(|re| re.is_match(&stdout))
+                    .unwrap_or(false),
             };
 
             let passed = code_matches && output_matches;
