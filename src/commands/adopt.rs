@@ -9,8 +9,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::parser::ParsedDoc;
-use crate::rules::detect_doc_type;
 use crate::rules::DocType;
+use crate::rules::detect_doc_type;
 
 /// Arguments for the adopt command.
 pub struct AdoptArgs {
@@ -303,10 +303,10 @@ fn scan_docs_recursive(
                 continue;
             }
             scan_docs_recursive(docs_root, &path, documents)?;
-        } else if path.extension().is_some_and(|ext| ext == "md") {
-            if let Some(analysis) = analyze_document(&path, docs_root)? {
-                documents.push(analysis);
-            }
+        } else if path.extension().is_some_and(|ext| ext == "md")
+            && let Some(analysis) = analyze_document(&path, docs_root)?
+        {
+            documents.push(analysis);
         }
     }
 
@@ -416,8 +416,9 @@ fn generate_report(docs_root: &Path, documents: &[DocAnalysis]) -> Result<Adopti
     }
 
     if files_with_examples < total_files / 2 {
-        recommendations
-            .push("Consider disabling require_examples initially (require_examples = false)".to_string());
+        recommendations.push(
+            "Consider disabling require_examples initially (require_examples = false)".to_string(),
+        );
     }
 
     if max_lines_found > 300 {
@@ -878,18 +879,19 @@ Good performance.
         let report = generate_report(Path::new("docs"), &documents).unwrap();
 
         assert!(!report.recommendations.is_empty());
-        assert!(report
-            .recommendations
-            .iter()
-            .any(|r| r.contains("Verification")));
-        assert!(report
-            .recommendations
-            .iter()
-            .any(|r| r.contains("Purpose")));
-        assert!(report
-            .recommendations
-            .iter()
-            .any(|r| r.contains("max_lines") || r.contains("300 lines")));
+        assert!(
+            report
+                .recommendations
+                .iter()
+                .any(|r| r.contains("Verification"))
+        );
+        assert!(report.recommendations.iter().any(|r| r.contains("Purpose")));
+        assert!(
+            report
+                .recommendations
+                .iter()
+                .any(|r| r.contains("max_lines") || r.contains("300 lines"))
+        );
     }
 
     #[test]

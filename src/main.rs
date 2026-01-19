@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 use paver::cli::{
-    AdoptOutputFormat, Cli, Command, ConfigCommand, DocType, HooksCommand, PromptOutputFormat,
+    AdoptOutputFormat, Cli, Command, ConfigCommand, DocType, HooksCommand, MigrateOutputFormat,
+    PromptOutputFormat,
 };
 use paver::commands::adopt::{self, AdoptArgs};
 use paver::commands::build;
@@ -14,6 +15,7 @@ use paver::commands::hooks;
 use paver::commands::index;
 use paver::commands::init;
 use paver::commands::lint::{self, LintArgs};
+use paver::commands::migrate::{self, MigrateArgs};
 use paver::commands::new::{self, NewArgs};
 use paver::commands::prompt::{generate_prompt, OutputFormat, PromptOptions};
 use paver::commands::status::{self, StatusArgs};
@@ -211,6 +213,26 @@ fn main() -> Result<()> {
                 format,
                 changed,
                 base,
+            })?;
+        }
+        Command::Migrate {
+            path,
+            format,
+            dry_run,
+            sections,
+            interactive,
+            backup,
+        } => {
+            migrate::execute(MigrateArgs {
+                path,
+                format: match format {
+                    MigrateOutputFormat::Text => migrate::MigrateOutputFormat::Text,
+                    MigrateOutputFormat::Json => migrate::MigrateOutputFormat::Json,
+                },
+                dry_run,
+                sections,
+                interactive,
+                backup,
             })?;
         }
     }

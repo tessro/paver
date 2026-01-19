@@ -156,9 +156,7 @@ pub fn execute(args: CoverageArgs) -> Result<()> {
     };
 
     // Check threshold
-    let threshold_met = args
-        .threshold
-        .map(|t| coverage_percentage >= t as f64);
+    let threshold_met = args.threshold.map(|t| coverage_percentage >= t as f64);
 
     let results = CoverageResults {
         covered_files: covered_count,
@@ -218,11 +216,7 @@ fn find_config() -> Result<PathBuf> {
 }
 
 /// Collect code files from the given path, applying include/exclude patterns.
-fn collect_code_files(
-    root: &Path,
-    include: &[String],
-    exclude: &[String],
-) -> Result<Vec<PathBuf>> {
+fn collect_code_files(root: &Path, include: &[String], exclude: &[String]) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     collect_code_files_recursive(root, root, include, exclude, &mut files)?;
     files.sort();
@@ -419,8 +413,10 @@ fn analyze_coverage(
         .collect();
 
     for file in code_files {
-        if matches_any_pattern(file, &all_patterns.iter().map(|s| s.as_str()).collect::<Vec<_>>())
-        {
+        if matches_any_pattern(
+            file,
+            &all_patterns.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+        ) {
             covered.push(file.clone());
         } else {
             uncovered.push(file.clone());
@@ -570,7 +566,11 @@ fn output_text(results: &CoverageResults) {
     println!(
         "Uncovered: {} file{} ({:.1}%)",
         results.uncovered_files,
-        if results.uncovered_files == 1 { "" } else { "s" },
+        if results.uncovered_files == 1 {
+            ""
+        } else {
+            "s"
+        },
         100.0 - results.coverage_percentage
     );
     println!();
@@ -590,20 +590,14 @@ fn output_text(results: &CoverageResults) {
     }
 
     if !results.uncovered.is_empty() {
-        println!(
-            "Uncovered Files ({}):",
-            results.uncovered.len()
-        );
+        println!("Uncovered Files ({}):", results.uncovered.len());
         // Limit display to first 20 files
         let display_limit = 20;
         for file in results.uncovered.iter().take(display_limit) {
             println!("  {}", file.path.display());
         }
         if results.uncovered.len() > display_limit {
-            println!(
-                "  ... and {} more",
-                results.uncovered.len() - display_limit
-            );
+            println!("  ... and {} more", results.uncovered.len() - display_limit);
         }
         println!();
     }

@@ -43,6 +43,16 @@ pub enum AdoptOutputFormat {
     Json,
 }
 
+/// Output format for migrate command.
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+pub enum MigrateOutputFormat {
+    /// Plain text output.
+    #[default]
+    Text,
+    /// JSON output for programmatic use.
+    Json,
+}
+
 #[derive(Subcommand)]
 pub enum Command {
     /// Scan existing documentation to help onboard paver
@@ -269,6 +279,33 @@ pub enum Command {
         /// Git ref for comparison with --changed [default: origin/main]
         #[arg(long)]
         base: Option<String>,
+    },
+
+    /// Bulk-insert missing PAVED sections into existing documentation
+    Migrate {
+        /// Path to migrate (file or directory) [default: docs root from config]
+        #[arg()]
+        path: Option<PathBuf>,
+
+        /// Output format: text, json
+        #[arg(long, default_value = "text", value_enum)]
+        format: MigrateOutputFormat,
+
+        /// Show what would change without modifying files
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Only add these sections (comma-separated)
+        #[arg(long)]
+        sections: Option<String>,
+
+        /// Confirm each file before modifying
+        #[arg(long, short = 'i')]
+        interactive: bool,
+
+        /// Create .bak files before modifying (default: true)
+        #[arg(long, default_value = "true", action = clap::ArgAction::Set)]
+        backup: bool,
     },
 }
 

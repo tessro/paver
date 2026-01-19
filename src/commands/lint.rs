@@ -732,12 +732,7 @@ fn check_missing_alt_text(path: &Path, lines: &[&str], results: &mut LintResults
 }
 
 /// Check for paragraphs that are too long.
-fn check_long_paragraphs(
-    path: &Path,
-    doc: &ParsedDoc,
-    max_words: u32,
-    results: &mut LintResults,
-) {
+fn check_long_paragraphs(path: &Path, doc: &ParsedDoc, max_words: u32, results: &mut LintResults) {
     // Process each section's content
     for section in &doc.sections {
         let content = &section.content;
@@ -775,7 +770,11 @@ fn check_long_paragraphs(
                 paragraph_line_offset = offset + 1;
             } else {
                 // Skip headings and list items for word counting
-                if !line.starts_with('#') && !line.trim_start().starts_with('-') && !line.trim_start().starts_with('*') && !line.trim_start().starts_with(|c: char| c.is_ascii_digit()) {
+                if !line.starts_with('#')
+                    && !line.trim_start().starts_with('-')
+                    && !line.trim_start().starts_with('*')
+                    && !line.trim_start().starts_with(|c: char| c.is_ascii_digit())
+                {
                     paragraph_words += line.split_whitespace().count();
                 }
             }
@@ -911,7 +910,11 @@ fn output_text(results: &LintResults, fix_mode: bool) {
         );
 
         if results.fixed_count > 0 {
-            println!("Auto-fixed {} issue{}.", results.fixed_count, if results.fixed_count == 1 { "" } else { "s" });
+            println!(
+                "Auto-fixed {} issue{}.",
+                results.fixed_count,
+                if results.fixed_count == 1 { "" } else { "s" }
+            );
         } else if fixable_count > 0 && !fix_mode {
             println!(
                 "Run 'paver lint --fix' to auto-fix {} issue{}.",
@@ -1119,7 +1122,10 @@ Optional patterns like `*.generated.rs` should be skipped.
 
         check_stale_code_refs(&path, &lines, temp_dir.path(), &mut results);
 
-        assert!(results.issues.is_empty(), "Glob patterns should not be flagged as stale refs");
+        assert!(
+            results.issues.is_empty(),
+            "Glob patterns should not be flagged as stale refs"
+        );
     }
 
     #[test]
@@ -1191,11 +1197,7 @@ Second section.
     #[test]
     fn test_trailing_whitespace() {
         let temp_dir = TempDir::new().unwrap();
-        let path = create_test_doc(
-            &temp_dir,
-            "test.md",
-            "# Test \nSome text.  \n",
-        );
+        let path = create_test_doc(&temp_dir, "test.md", "# Test \nSome text.  \n");
 
         let content = fs::read_to_string(&path).unwrap();
         let lines: Vec<&str> = content.lines().collect();
@@ -1211,16 +1213,13 @@ Second section.
     #[test]
     fn test_trailing_whitespace_fix() {
         let temp_dir = TempDir::new().unwrap();
-        let path = create_test_doc(
-            &temp_dir,
-            "test.md",
-            "# Test \nSome text.  \n",
-        );
+        let path = create_test_doc(&temp_dir, "test.md", "# Test \nSome text.  \n");
 
         let content = fs::read_to_string(&path).unwrap();
         let lines: Vec<&str> = content.lines().collect();
         let mut results = LintResults::new();
-        let mut fixed_lines: Option<Vec<String>> = Some(lines.iter().map(|s| s.to_string()).collect());
+        let mut fixed_lines: Option<Vec<String>> =
+            Some(lines.iter().map(|s| s.to_string()).collect());
 
         check_trailing_whitespace(&path, &lines, true, &mut fixed_lines, &mut results);
 
@@ -1273,8 +1272,10 @@ Second section.
 
     #[test]
     fn test_determine_rules_with_disabled() {
-        let mut config = LintSection::default();
-        config.disable = vec!["long-paragraphs".to_string()];
+        let config = LintSection {
+            disable: vec!["long-paragraphs".to_string()],
+            ..Default::default()
+        };
 
         let args = LintArgs {
             paths: vec![],
