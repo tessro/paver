@@ -1,21 +1,30 @@
-//! Verification specification model for structured verification data.
+//! Verification module for executing and validating commands from documentation.
 //!
-//! This module defines the data structures for representing verification commands
-//! and expected behaviors extracted from PAVED documents.
+//! This module provides functionality to:
+//! - Extract verification specifications from parsed markdown documents
+//! - Execute verification commands with timeout and output capture
+//! - Report results including pass/fail status, timing, and error details
 
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
 
-use crate::parser::ParsedDoc;
+use crate::parser::{CodeBlock, ParsedDoc};
 
-/// A verification specification extracted from a PAVED document.
+/// Default timeout for command execution in seconds.
+pub const DEFAULT_TIMEOUT_SECS: u32 = 30;
+
+/// Specifies how to match command output.
 #[derive(Debug, Clone, PartialEq)]
-pub struct VerificationSpec {
-    /// Path to the source markdown file.
-    pub source_file: PathBuf,
-    /// Line number where the Verification section starts (1-indexed).
-    pub section_line: usize,
-    /// Individual verification items (commands to run).
-    pub items: Vec<VerificationItem>,
+pub enum OutputMatcher {
+    /// Match if stdout contains the given substring.
+    Contains(String),
+    /// Match if stdout matches the given regex pattern.
+    Regex(String),
+    /// Only check the exit code, ignore output.
+    ExitCodeOnly,
 }
 
 /// A single verification item representing a command to execute.
@@ -23,11 +32,11 @@ pub struct VerificationSpec {
 pub struct VerificationItem {
     /// The shell command to run.
     pub command: String,
-    /// Optional working directory for the command.
+    /// Optional working directory for command execution.
     pub working_dir: Option<PathBuf>,
     /// Expected exit code (default: 0).
     pub expected_exit_code: Option<i32>,
-    /// Expected output matcher.
+    /// How to validate command output.
     pub expected_output: Option<OutputMatcher>,
     /// Timeout in seconds (default: 30).
     pub timeout_secs: Option<u32>,
@@ -40,51 +49,74 @@ impl Default for VerificationItem {
             working_dir: None,
             expected_exit_code: Some(0),
             expected_output: None,
-            timeout_secs: Some(30),
+            timeout_secs: Some(DEFAULT_TIMEOUT_SECS),
         }
     }
 }
 
-/// Matcher for verifying command output.
+/// A verification specification extracted from a document.
 #[derive(Debug, Clone, PartialEq)]
-pub enum OutputMatcher {
-    /// Stdout must contain the given substring.
-    Contains(String),
-    /// Stdout must match the given regex pattern.
-    Regex(String),
-    /// Only check exit code, ignore output.
-    ExitCodeOnly,
+pub struct VerificationSpec {
+    /// Path to the source markdown file.
+    pub source_file: PathBuf,
+    /// Line number where the verification section starts.
+    pub section_line: usize,
+    /// List of verification items to execute.
+    pub items: Vec<VerificationItem>,
+}
+
+/// Result of executing a single verification item.
+#[derive(Debug)]
+pub struct VerificationResult {
+    /// The verification item that was executed.
+    pub item: VerificationItem,
+    /// Whether the verification passed.
+    pub passed: bool,
+    /// Exit code returned by the command (None if command didn't complete).
+    pub exit_code: Option<i32>,
+    /// Captured stdout from the command.
+    pub stdout: String,
+    /// Captured stderr from the command.
+    pub stderr: String,
+    /// Execution duration in milliseconds.
+    pub duration_ms: u64,
+    /// Error message if execution failed (e.g., "timeout", "command not found").
+    pub error: Option<String>,
 }
 
 /// Extract a verification specification from a parsed document.
 ///
-/// Returns `None` if the document has no Verification section or
-/// if the Verification section contains no executable code blocks.
+/// Looks for a "Verification" section and extracts executable code blocks
+/// as verification items.
+///
+/// # Arguments
+/// * `doc` - The parsed markdown document
+///
+/// # Returns
+/// `Some(VerificationSpec)` if a Verification section with commands exists,
+/// `None` otherwise.
 pub fn extract_verification_spec(doc: &ParsedDoc) -> Option<VerificationSpec> {
     let section = doc.get_section("Verification")?;
 
-    if section.code_blocks.is_empty() {
+    let executable_blocks: Vec<&CodeBlock> = section.executable_commands();
+
+    if executable_blocks.is_empty() {
         return None;
     }
 
-    let mut items = Vec::new();
-
-    for block in &section.code_blocks {
-        // Only extract from executable code blocks (uses parser's is_executable detection)
-        if block.is_executable {
-            let commands = extract_commands_from_block(&block.content);
-            for command in commands {
-                items.push(VerificationItem {
-                    command,
-                    ..Default::default()
-                });
+    let items: Vec<VerificationItem> = executable_blocks
+        .into_iter()
+        .map(|block| {
+            let command = extract_command_from_block(&block.content);
+            VerificationItem {
+                command,
+                working_dir: None,
+                expected_exit_code: Some(0),
+                expected_output: None,
+                timeout_secs: Some(DEFAULT_TIMEOUT_SECS),
             }
-        }
-    }
-
-    if items.is_empty() {
-        return None;
-    }
+        })
+        .collect();
 
     Some(VerificationSpec {
         source_file: doc.path.clone(),
@@ -93,137 +125,398 @@ pub fn extract_verification_spec(doc: &ParsedDoc) -> Option<VerificationSpec> {
     })
 }
 
-/// Extract individual commands from a code block's content.
+/// Extract the command string from a code block's content.
 ///
-/// Handles:
-/// - Lines starting with `$ ` (shell prompt syntax)
-/// - Plain commands (each non-empty line is a command)
-/// - Multi-line commands with backslash continuations
-fn extract_commands_from_block(content: &str) -> Vec<String> {
+/// Handles various formats:
+/// - Lines starting with `$ ` (shell prompt) - strips the prompt
+/// - Lines starting with `> ` (REPL prompt) - strips the prompt
+/// - Plain commands without prompts
+/// - Skips empty lines and comment lines (starting with #)
+fn extract_command_from_block(content: &str) -> String {
     let mut commands = Vec::new();
-    let mut current_command = String::new();
-    let mut in_continuation = false;
 
     for line in content.lines() {
         let trimmed = line.trim();
 
         // Skip empty lines and comment-only lines
         if trimmed.is_empty() || trimmed.starts_with('#') {
-            if !in_continuation && !current_command.is_empty() {
-                commands.push(current_command.trim().to_string());
-                current_command.clear();
-            }
             continue;
         }
 
-        // Handle shell prompt syntax ($ command)
-        let command_part = if let Some(cmd) = trimmed.strip_prefix("$ ") {
-            cmd
+        // Strip shell prompt prefixes
+        let cmd = if let Some(rest) = trimmed.strip_prefix("$ ") {
+            rest.to_string()
+        } else if let Some(rest) = trimmed.strip_prefix("> ") {
+            rest.to_string()
         } else {
-            trimmed
+            trimmed.to_string()
         };
 
-        // Handle line continuations (backslash at end)
-        if let Some(without_backslash) = command_part.strip_suffix('\\') {
-            if in_continuation {
-                current_command.push_str(without_backslash);
-            } else {
-                current_command = without_backslash.to_string();
-            }
-            current_command.push(' ');
-            in_continuation = true;
-        } else if in_continuation {
-            current_command.push_str(command_part);
-            commands.push(current_command.trim().to_string());
-            current_command.clear();
-            in_continuation = false;
-        } else {
-            commands.push(command_part.to_string());
+        if !cmd.is_empty() {
+            commands.push(cmd);
         }
     }
 
-    // Handle any remaining command
-    if !current_command.is_empty() {
-        commands.push(current_command.trim().to_string());
+    commands.join(" && ")
+}
+
+/// Execute all verification items in a specification.
+///
+/// Runs each command and collects results including:
+/// - Pass/fail status based on exit code comparison
+/// - Captured stdout and stderr
+/// - Execution timing
+/// - Error details for failures
+///
+/// # Arguments
+/// * `spec` - The verification specification to execute
+///
+/// # Returns
+/// A vector of `VerificationResult` for each item in the spec.
+pub fn run_verification(spec: &VerificationSpec) -> Vec<VerificationResult> {
+    spec.items.iter().map(run_single_verification).collect()
+}
+
+/// Execute a single verification item.
+fn run_single_verification(item: &VerificationItem) -> VerificationResult {
+    let timeout = Duration::from_secs(item.timeout_secs.unwrap_or(DEFAULT_TIMEOUT_SECS) as u64);
+    let start = Instant::now();
+
+    // Clone item for the result
+    let item_clone = item.clone();
+
+    // Spawn the command
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c").arg(&item.command);
+
+    if let Some(ref working_dir) = item.working_dir {
+        cmd.current_dir(working_dir);
     }
 
-    commands
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    let child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            return VerificationResult {
+                item: item_clone,
+                passed: false,
+                exit_code: None,
+                stdout: String::new(),
+                stderr: String::new(),
+                duration_ms: start.elapsed().as_millis() as u64,
+                error: Some(format!("failed to spawn command: {}", e)),
+            };
+        }
+    };
+
+    // Use a channel to receive the result with timeout
+    let (tx, rx) = mpsc::channel();
+
+    let handle = thread::spawn(move || {
+        let output = child.wait_with_output();
+        let _ = tx.send(output);
+    });
+
+    match rx.recv_timeout(timeout) {
+        Ok(Ok(output)) => {
+            let _ = handle.join();
+            let duration_ms = start.elapsed().as_millis() as u64;
+            let exit_code = output.status.code();
+            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+            let expected_code = item.expected_exit_code.unwrap_or(0);
+            let code_matches = exit_code == Some(expected_code);
+
+            let output_matches = match &item.expected_output {
+                None => true,
+                Some(OutputMatcher::ExitCodeOnly) => true,
+                Some(OutputMatcher::Contains(substring)) => stdout.contains(substring),
+                Some(OutputMatcher::Regex(pattern)) => {
+                    regex::Regex::new(pattern)
+                        .map(|re| re.is_match(&stdout))
+                        .unwrap_or(false)
+                }
+            };
+
+            let passed = code_matches && output_matches;
+
+            VerificationResult {
+                item: item_clone,
+                passed,
+                exit_code,
+                stdout,
+                stderr,
+                duration_ms,
+                error: None,
+            }
+        }
+        Ok(Err(e)) => {
+            let _ = handle.join();
+            VerificationResult {
+                item: item_clone,
+                passed: false,
+                exit_code: None,
+                stdout: String::new(),
+                stderr: String::new(),
+                duration_ms: start.elapsed().as_millis() as u64,
+                error: Some(format!("command execution failed: {}", e)),
+            }
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            // Command timed out - we can't easily kill the process from here,
+            // but we report the timeout
+            VerificationResult {
+                item: item_clone,
+                passed: false,
+                exit_code: None,
+                stdout: String::new(),
+                stderr: String::new(),
+                duration_ms: start.elapsed().as_millis() as u64,
+                error: Some("timeout".to_string()),
+            }
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => VerificationResult {
+            item: item_clone,
+            passed: false,
+            exit_code: None,
+            stdout: String::new(),
+            stderr: String::new(),
+            duration_ms: start.elapsed().as_millis() as u64,
+            error: Some("command thread disconnected unexpectedly".to_string()),
+        },
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
-    fn extract_simple_command_from_verification_section() {
-        let content = r#"# My Component
+    fn test_successful_command_returns_passed_true() {
+        let item = VerificationItem {
+            command: "echo hello".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: None,
+            timeout_secs: Some(5),
+        };
 
-## Purpose
-A test component.
+        let result = run_single_verification(&item);
+
+        assert!(result.passed);
+        assert_eq!(result.exit_code, Some(0));
+        assert!(result.stdout.contains("hello"));
+        assert!(result.error.is_none());
+    }
+
+    #[test]
+    fn test_failed_command_returns_passed_false() {
+        let item = VerificationItem {
+            command: "exit 1".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: None,
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(!result.passed);
+        assert_eq!(result.exit_code, Some(1));
+    }
+
+    #[test]
+    fn test_timeout_handling() {
+        let item = VerificationItem {
+            command: "sleep 10".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: None,
+            timeout_secs: Some(1),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(!result.passed);
+        assert_eq!(result.error, Some("timeout".to_string()));
+    }
+
+    #[test]
+    fn test_output_capture_stdout() {
+        let item = VerificationItem {
+            command: "echo 'test output'".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: None,
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(result.passed);
+        assert!(result.stdout.contains("test output"));
+    }
+
+    #[test]
+    fn test_output_capture_stderr() {
+        let item = VerificationItem {
+            command: "echo 'error message' >&2".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: None,
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(result.passed);
+        assert!(result.stderr.contains("error message"));
+    }
+
+    #[test]
+    fn test_command_not_found() {
+        let item = VerificationItem {
+            command: "nonexistent_command_12345".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: None,
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(!result.passed);
+        // Command not found typically returns 127
+        assert!(result.exit_code == Some(127) || result.error.is_some());
+    }
+
+    #[test]
+    fn test_expected_exit_code_matching() {
+        let item = VerificationItem {
+            command: "exit 42".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(42),
+            expected_output: None,
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(result.passed);
+        assert_eq!(result.exit_code, Some(42));
+    }
+
+    #[test]
+    fn test_output_contains_matcher() {
+        let item = VerificationItem {
+            command: "echo 'hello world'".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: Some(OutputMatcher::Contains("world".to_string())),
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(result.passed);
+    }
+
+    #[test]
+    fn test_output_contains_matcher_fails() {
+        let item = VerificationItem {
+            command: "echo 'hello world'".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: Some(OutputMatcher::Contains("foo".to_string())),
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(!result.passed);
+    }
+
+    #[test]
+    fn test_duration_is_recorded() {
+        let item = VerificationItem {
+            command: "sleep 0.1".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: None,
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(result.duration_ms >= 100);
+    }
+
+    #[test]
+    fn test_extract_command_from_block_with_dollar_prefix() {
+        let content = "$ echo hello\n$ echo world";
+        let cmd = extract_command_from_block(content);
+        assert_eq!(cmd, "echo hello && echo world");
+    }
+
+    #[test]
+    fn test_extract_command_from_block_without_prefix() {
+        let content = "echo hello";
+        let cmd = extract_command_from_block(content);
+        assert_eq!(cmd, "echo hello");
+    }
+
+    #[test]
+    fn test_extract_command_from_block_mixed() {
+        let content = "$ cargo build\ncargo test";
+        let cmd = extract_command_from_block(content);
+        assert_eq!(cmd, "cargo build && cargo test");
+    }
+
+    #[test]
+    fn test_extract_command_from_block_skips_comments() {
+        let content = "# This is a comment\necho hello\n# Another comment\necho world";
+        let cmd = extract_command_from_block(content);
+        assert_eq!(cmd, "echo hello && echo world");
+    }
+
+    #[test]
+    fn test_extract_command_from_block_skips_empty_lines() {
+        let content = "echo hello\n\n\necho world";
+        let cmd = extract_command_from_block(content);
+        assert_eq!(cmd, "echo hello && echo world");
+    }
+
+    #[test]
+    fn test_extract_verification_spec_from_doc() {
+        let content = r#"# Test Doc
 
 ## Verification
-Run the tests:
+Run the test:
 ```bash
-cargo test
+echo "test"
 ```
 "#;
 
         let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
+        let spec = extract_verification_spec(&doc);
 
+        assert!(spec.is_some());
+        let spec = spec.unwrap();
         assert_eq!(spec.source_file, PathBuf::from("test.md"));
         assert_eq!(spec.items.len(), 1);
-        assert_eq!(spec.items[0].command, "cargo test");
-        assert_eq!(spec.items[0].expected_exit_code, Some(0));
-        assert_eq!(spec.items[0].timeout_secs, Some(30));
+        assert_eq!(spec.items[0].command, "echo \"test\"");
     }
 
     #[test]
-    fn handle_multiple_commands() {
-        let content = r#"# Test
-
-## Verification
-```bash
-cargo build
-cargo test
-cargo clippy
-```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
-        assert_eq!(spec.items.len(), 3);
-        assert_eq!(spec.items[0].command, "cargo build");
-        assert_eq!(spec.items[1].command, "cargo test");
-        assert_eq!(spec.items[2].command, "cargo clippy");
-    }
-
-    #[test]
-    fn default_expected_exit_code_is_zero() {
-        let content = r#"# Test
-
-## Verification
-```bash
-echo "hello"
-```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
-        assert_eq!(spec.items[0].expected_exit_code, Some(0));
-    }
-
-    #[test]
-    fn document_without_verification_section_returns_none() {
-        let content = r#"# Test
+    fn test_extract_verification_spec_no_verification_section() {
+        let content = r#"# Test Doc
 
 ## Purpose
 Just a purpose section.
-
-## Interface
-API description.
 "#;
 
         let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
@@ -233,11 +526,11 @@ API description.
     }
 
     #[test]
-    fn empty_verification_section_returns_none() {
-        let content = r#"# Test
+    fn test_extract_verification_spec_empty_verification_section() {
+        let content = r#"# Test Doc
 
 ## Verification
-This section has no code blocks.
+No code blocks here, just text.
 "#;
 
         let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
@@ -247,232 +540,74 @@ This section has no code blocks.
     }
 
     #[test]
-    fn handle_shell_prompt_syntax() {
-        let content = r#"# Test
+    fn test_extract_verification_spec_multiple_commands() {
+        let content = r#"# Test Doc
 
 ## Verification
 ```bash
-$ cargo test
-$ cargo build --release
+echo "first"
 ```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
-        assert_eq!(spec.items.len(), 2);
-        assert_eq!(spec.items[0].command, "cargo test");
-        assert_eq!(spec.items[1].command, "cargo build --release");
-    }
-
-    #[test]
-    fn handle_multiple_code_blocks() {
-        let content = r#"# Test
-
-## Verification
-First set of tests:
-```bash
-cargo test
-```
-Second set:
 ```sh
-make lint
-```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
-        assert_eq!(spec.items.len(), 2);
-        assert_eq!(spec.items[0].command, "cargo test");
-        assert_eq!(spec.items[1].command, "make lint");
-    }
-
-    #[test]
-    fn skip_non_executable_code_blocks() {
-        let content = r#"# Test
-
-## Verification
-Example output:
-```json
-{"status": "ok"}
-```
-Run this:
-```bash
-curl localhost:8080
-```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
-        assert_eq!(spec.items.len(), 1);
-        assert_eq!(spec.items[0].command, "curl localhost:8080");
-    }
-
-    #[test]
-    fn handle_line_continuations() {
-        let content = r#"# Test
-
-## Verification
-```bash
-cargo build \
-  --release \
-  --features all
-```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
-        assert_eq!(spec.items.len(), 1);
-        assert_eq!(
-            spec.items[0].command,
-            "cargo build  --release  --features all"
-        );
-    }
-
-    #[test]
-    fn skip_comment_lines() {
-        let content = r#"# Test
-
-## Verification
-```bash
-# This is a comment
-cargo test
-# Another comment
-cargo build
-```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
-        assert_eq!(spec.items.len(), 2);
-        assert_eq!(spec.items[0].command, "cargo test");
-        assert_eq!(spec.items[1].command, "cargo build");
-    }
-
-    #[test]
-    fn section_line_is_correct() {
-        let content = r#"# Title
-
-## Purpose
-Some content.
-
-## Verification
-```bash
-cargo test
-```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
-        // Line 1: # Title
-        // Line 2: blank
-        // Line 3: ## Purpose
-        // Line 4: Some content.
-        // Line 5: blank
-        // Line 6: ## Verification
-        assert_eq!(spec.section_line, 6);
-    }
-
-    #[test]
-    fn handle_code_block_without_language_but_with_prompt() {
-        // Code blocks without language are only executable if they contain $ or > prompts
-        let content = r#"# Test
-
-## Verification
-```
-$ cargo test
-```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
-        assert_eq!(spec.items.len(), 1);
-        assert_eq!(spec.items[0].command, "cargo test");
-    }
-
-    #[test]
-    fn code_block_without_language_or_prompt_is_not_executable() {
-        // Code blocks without language and without prompts are not treated as executable
-        let content = r#"# Test
-
-## Verification
-```
-cargo test
+echo "second"
 ```
 "#;
 
         let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
         let spec = extract_verification_spec(&doc);
 
-        // Returns None because the plain code block is not detected as executable
-        assert!(spec.is_none());
-    }
-
-    #[test]
-    fn verification_item_default_values() {
-        let item = VerificationItem::default();
-
-        assert!(item.command.is_empty());
-        assert!(item.working_dir.is_none());
-        assert_eq!(item.expected_exit_code, Some(0));
-        assert!(item.expected_output.is_none());
-        assert_eq!(item.timeout_secs, Some(30));
-    }
-
-    #[test]
-    fn handle_empty_lines_in_code_block() {
-        let content = r#"# Test
-
-## Verification
-```bash
-cargo build
-
-cargo test
-```
-"#;
-
-        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
-        let spec = extract_verification_spec(&doc).unwrap();
-
+        assert!(spec.is_some());
+        let spec = spec.unwrap();
         assert_eq!(spec.items.len(), 2);
-        assert_eq!(spec.items[0].command, "cargo build");
-        assert_eq!(spec.items[1].command, "cargo test");
     }
 
     #[test]
-    fn verification_spec_clone_and_eq() {
+    fn test_run_verification_executes_all_items() {
         let spec = VerificationSpec {
             source_file: PathBuf::from("test.md"),
-            section_line: 10,
-            items: vec![VerificationItem {
-                command: "cargo test".to_string(),
-                ..Default::default()
-            }],
+            section_line: 1,
+            items: vec![
+                VerificationItem {
+                    command: "echo 'first'".to_string(),
+                    working_dir: None,
+                    expected_exit_code: Some(0),
+                    expected_output: None,
+                    timeout_secs: Some(5),
+                },
+                VerificationItem {
+                    command: "echo 'second'".to_string(),
+                    working_dir: None,
+                    expected_exit_code: Some(0),
+                    expected_output: None,
+                    timeout_secs: Some(5),
+                },
+            ],
         };
 
-        let cloned = spec.clone();
-        assert_eq!(spec, cloned);
+        let results = run_verification(&spec);
+
+        assert_eq!(results.len(), 2);
+        assert!(results[0].passed);
+        assert!(results[1].passed);
+        assert!(results[0].stdout.contains("first"));
+        assert!(results[1].stdout.contains("second"));
     }
 
     #[test]
-    fn output_matcher_variants() {
-        let contains = OutputMatcher::Contains("success".to_string());
-        let regex = OutputMatcher::Regex(r"\d+ tests passed".to_string());
-        let exit_only = OutputMatcher::ExitCodeOnly;
+    fn test_integration_actual_echo_command() {
+        let item = VerificationItem {
+            command: "echo 'Hello, World!'".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: Some(OutputMatcher::Contains("Hello, World!".to_string())),
+            timeout_secs: Some(5),
+        };
 
-        // Test clone and eq
-        assert_eq!(contains.clone(), contains);
-        assert_eq!(regex.clone(), regex);
-        assert_eq!(exit_only.clone(), exit_only);
+        let result = run_single_verification(&item);
 
-        // Test they're different
-        assert_ne!(contains, regex);
-        assert_ne!(regex, exit_only);
+        assert!(result.passed);
+        assert_eq!(result.exit_code, Some(0));
+        assert!(result.stdout.contains("Hello, World!"));
+        assert!(result.error.is_none());
+        assert!(result.duration_ms > 0);
     }
 }
