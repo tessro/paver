@@ -1,0 +1,27 @@
+# Paver configuration file
+# See https://github.com/tessro/paver for documentation
+
+[paver]
+version = "0.1"
+
+[docs]
+# Root directory for documentation
+root = "docs"
+
+# Directory containing document templates
+templates = "docs/templates"
+
+[rules]
+# Maximum lines per document
+max_lines = 300
+
+# Require Verification section in documents
+require_verification = true
+
+# Require Examples section in documents
+require_examples = true
+
+[templates]
+component = "component.md"
+runbook = "runbook.md"
+adr = "adr.md"
