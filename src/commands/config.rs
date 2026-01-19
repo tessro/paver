@@ -215,7 +215,8 @@ mod tests {
 
     #[test]
     fn test_get_nested_value() {
-        let config: Value = r#"
+        let config: Value = toml::from_str(
+            r#"
             [docs]
             root = "docs"
 
@@ -223,7 +224,8 @@ mod tests {
             max_lines = 300
             require_verification = true
         "#
-        .parse()
+            .trim(),
+        )
         .unwrap();
 
         assert_eq!(
@@ -242,11 +244,13 @@ mod tests {
 
     #[test]
     fn test_get_missing_key() {
-        let config: Value = r#"
+        let config: Value = toml::from_str(
+            r#"
             [docs]
             root = "docs"
         "#
-        .parse()
+            .trim(),
+        )
         .unwrap();
 
         let result = get_nested_value(&config, "docs.missing");
@@ -256,11 +260,13 @@ mod tests {
 
     #[test]
     fn test_set_nested_value() {
-        let mut config: Value = r#"
+        let mut config: Value = toml::from_str(
+            r#"
             [docs]
             root = "docs"
         "#
-        .parse()
+            .trim(),
+        )
         .unwrap();
 
         set_nested_value(
@@ -277,11 +283,13 @@ mod tests {
 
     #[test]
     fn test_set_creates_intermediate_tables() {
-        let mut config: Value = r#"
+        let mut config: Value = toml::from_str(
+            r#"
             [docs]
             root = "docs"
         "#
-        .parse()
+            .trim(),
+        )
         .unwrap();
 
         set_nested_value(&mut config, "rules.max_lines", Value::Integer(500)).unwrap();
