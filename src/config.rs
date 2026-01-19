@@ -60,6 +60,10 @@ pub struct RulesSection {
     /// Require Examples section in documents.
     #[serde(default = "default_true")]
     pub require_examples: bool,
+    /// When true, verification fails if output doesn't match expected patterns.
+    /// When false (default), output matching is advisory only.
+    #[serde(default)]
+    pub strict_output_matching: bool,
 }
 
 /// Template file mappings section.
@@ -123,6 +127,7 @@ impl Default for RulesSection {
             max_lines: default_max_lines(),
             require_verification: true,
             require_examples: true,
+            strict_output_matching: false,
         }
     }
 }
@@ -402,5 +407,34 @@ root = "docs"
         let serialized = toml::to_string_pretty(&config).unwrap();
         let deserialized = PaverConfig::parse(&serialized).unwrap();
         assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn parse_config_with_strict_output_matching() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+
+[rules]
+strict_output_matching = true
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(config.rules.strict_output_matching);
+    }
+
+    #[test]
+    fn default_strict_output_matching_is_false() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(!config.rules.strict_output_matching);
     }
 }

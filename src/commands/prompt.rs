@@ -386,6 +386,7 @@ mod tests {
             max_lines: 500,
             require_verification: false,
             require_examples: true,
+            strict_output_matching: false,
         };
 
         let formatted = format_rules(&rules);

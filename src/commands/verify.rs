@@ -544,9 +544,10 @@ require_examples = true
         let docs_dir = temp_dir.path().join("docs");
         fs::create_dir_all(&docs_dir).unwrap();
 
+        // Create separate code blocks for each command so they become separate verification items
         let commands_str = commands
             .iter()
-            .map(|c| format!("$ {}", c))
+            .map(|c| format!("```bash\n{}\n```", c))
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -557,9 +558,7 @@ require_examples = true
 A test document.
 
 ## Verification
-```bash
 {}
-```
 
 ## Examples
 Example here.

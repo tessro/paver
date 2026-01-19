@@ -11,7 +11,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::parser::{CodeBlock, ParsedDoc};
+use crate::parser::{CodeBlock, ExpectMatchStrategy, ParsedDoc};
 
 /// Default timeout for command execution in seconds.
 pub const DEFAULT_TIMEOUT_SECS: u32 = 30;
@@ -23,6 +23,8 @@ pub enum OutputMatcher {
     Contains(String),
     /// Match if stdout matches the given regex pattern.
     Regex(String),
+    /// Match if stdout matches exactly (after trimming whitespace).
+    Exact(String),
     /// Only check the exit code, ignore output.
     ExitCodeOnly,
 }
@@ -108,11 +110,12 @@ pub fn extract_verification_spec(doc: &ParsedDoc) -> Option<VerificationSpec> {
         .into_iter()
         .map(|block| {
             let command = extract_command_from_block(&block.content);
+            let expected_output = convert_expected_output(block);
             VerificationItem {
                 command,
                 working_dir: None,
                 expected_exit_code: Some(0),
-                expected_output: None,
+                expected_output,
                 timeout_secs: Some(DEFAULT_TIMEOUT_SECS),
             }
         })
@@ -123,6 +126,19 @@ pub fn extract_verification_spec(doc: &ParsedDoc) -> Option<VerificationSpec> {
         section_line: section.start_line,
         items,
     })
+}
+
+/// Convert parsed expected output to an OutputMatcher.
+fn convert_expected_output(block: &CodeBlock) -> Option<OutputMatcher> {
+    let expected = block.expected_output.as_ref()?;
+
+    let matcher = match expected.strategy {
+        ExpectMatchStrategy::Contains => OutputMatcher::Contains(expected.content.clone()),
+        ExpectMatchStrategy::Regex => OutputMatcher::Regex(expected.content.clone()),
+        ExpectMatchStrategy::Exact => OutputMatcher::Exact(expected.content.clone()),
+    };
+
+    Some(matcher)
 }
 
 /// Extract the command string from a code block's content.
@@ -237,6 +253,7 @@ fn run_single_verification(item: &VerificationItem) -> VerificationResult {
                 Some(OutputMatcher::Regex(pattern)) => regex::Regex::new(pattern)
                     .map(|re| re.is_match(&stdout))
                     .unwrap_or(false),
+                Some(OutputMatcher::Exact(expected)) => stdout.trim() == expected.trim(),
             };
 
             let passed = code_matches && output_matches;
@@ -607,5 +624,121 @@ echo "second"
         assert!(result.stdout.contains("Hello, World!"));
         assert!(result.error.is_none());
         assert!(result.duration_ms > 0);
+    }
+
+    #[test]
+    fn test_output_regex_matcher() {
+        let item = VerificationItem {
+            command: "echo 'test 123 passed'".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: Some(OutputMatcher::Regex(r"test \d+ passed".to_string())),
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(result.passed);
+    }
+
+    #[test]
+    fn test_output_regex_matcher_fails() {
+        let item = VerificationItem {
+            command: "echo 'test abc passed'".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: Some(OutputMatcher::Regex(r"test \d+ passed".to_string())),
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(!result.passed);
+    }
+
+    #[test]
+    fn test_output_exact_matcher() {
+        let item = VerificationItem {
+            command: "echo 'hello'".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: Some(OutputMatcher::Exact("hello".to_string())),
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(result.passed);
+    }
+
+    #[test]
+    fn test_output_exact_matcher_fails() {
+        let item = VerificationItem {
+            command: "echo 'hello world'".to_string(),
+            working_dir: None,
+            expected_exit_code: Some(0),
+            expected_output: Some(OutputMatcher::Exact("hello".to_string())),
+            timeout_secs: Some(5),
+        };
+
+        let result = run_single_verification(&item);
+
+        assert!(!result.passed);
+    }
+
+    #[test]
+    fn test_extract_verification_spec_with_inline_output() {
+        let content = r#"# Test Doc
+
+## Verification
+```bash
+$ echo hello
+hello
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let spec = extract_verification_spec(&doc);
+
+        assert!(spec.is_some());
+        let spec = spec.unwrap();
+        assert_eq!(spec.items.len(), 1);
+
+        let item = &spec.items[0];
+        assert_eq!(item.command, "echo hello");
+        assert!(item.expected_output.is_some());
+        match &item.expected_output {
+            Some(OutputMatcher::Contains(s)) => assert!(s.contains("hello")),
+            _ => panic!("Expected Contains matcher"),
+        }
+    }
+
+    #[test]
+    fn test_extract_verification_spec_with_explicit_output_block() {
+        let content = r#"# Test Doc
+
+## Verification
+```bash
+cargo test
+```
+<!-- paver:expect:regex -->
+```
+test result: ok\. \d+ passed
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let spec = extract_verification_spec(&doc);
+
+        assert!(spec.is_some());
+        let spec = spec.unwrap();
+        assert_eq!(spec.items.len(), 1);
+
+        let item = &spec.items[0];
+        assert!(item.expected_output.is_some());
+        match &item.expected_output {
+            Some(OutputMatcher::Regex(s)) => assert!(s.contains(r"\d+")),
+            _ => panic!("Expected Regex matcher"),
+        }
     }
 }

@@ -218,13 +218,12 @@ fn parse_git_diff_output(output: &[u8]) -> Result<HashSet<PathBuf>> {
 /// Load all documentation files with their path mappings.
 fn load_doc_mappings(docs_root: &Path, config_dir: &Path) -> Result<Vec<DocMapping>> {
     let mut mappings = Vec::new();
-    load_doc_mappings_recursive(docs_root, docs_root, config_dir, &mut mappings)?;
+    load_doc_mappings_recursive(docs_root, config_dir, &mut mappings)?;
     Ok(mappings)
 }
 
 /// Recursively load documentation files.
 fn load_doc_mappings_recursive(
-    docs_root: &Path,
     current: &Path,
     config_dir: &Path,
     mappings: &mut Vec<DocMapping>,
@@ -243,7 +242,7 @@ fn load_doc_mappings_recursive(
             if path.file_name().is_some_and(|n| n == "templates") {
                 continue;
             }
-            load_doc_mappings_recursive(docs_root, &path, config_dir, mappings)?;
+            load_doc_mappings_recursive(&path, config_dir, mappings)?;
         } else if path.extension().is_some_and(|ext| ext == "md") {
             // Skip index.md
             if path.file_name().is_some_and(|n| n == "index.md") {
@@ -285,10 +284,10 @@ fn parse_doc_mapping(path: &Path, config_dir: &Path) -> Result<Option<DocMapping
 fn extract_title(content: &str) -> Option<String> {
     for line in content.lines() {
         let trimmed = line.trim();
-        if let Some(title) = trimmed.strip_prefix("# ") {
-            if !title.starts_with('#') {
-                return Some(title.trim().to_string());
-            }
+        if let Some(title) = trimmed.strip_prefix("# ")
+            && !title.starts_with('#')
+        {
+            return Some(title.trim().to_string());
         }
     }
     None
@@ -314,17 +313,16 @@ fn extract_paths_patterns(content: &str) -> Vec<String> {
         }
 
         // Collect patterns (lines starting with - or *)
-        if in_paths_section {
-            if let Some(pattern) = trimmed
+        if in_paths_section
+            && let Some(pattern) = trimmed
                 .strip_prefix("- ")
                 .or_else(|| trimmed.strip_prefix("* "))
-            {
-                let pattern = pattern.trim();
-                // Remove backticks if present
-                let pattern = pattern.trim_matches('`');
-                if !pattern.is_empty() {
-                    patterns.push(pattern.to_string());
-                }
+        {
+            let pattern = pattern.trim();
+            // Remove backticks if present
+            let pattern = pattern.trim_matches('`');
+            if !pattern.is_empty() {
+                patterns.push(pattern.to_string());
             }
         }
     }
@@ -383,10 +381,10 @@ fn matches_any_pattern(path: &Path, patterns: &[String]) -> bool {
 
     for pattern_str in patterns {
         // Try to compile as glob pattern
-        if let Ok(pattern) = Pattern::new(pattern_str) {
-            if pattern.matches(&path_str) {
-                return true;
-            }
+        if let Ok(pattern) = Pattern::new(pattern_str)
+            && pattern.matches(&path_str)
+        {
+            return true;
         }
 
         // Also do simple prefix matching for patterns like "src/foo/"
@@ -436,8 +434,7 @@ fn output_text(results: &ChangedResults) {
         let status = if doc.was_updated { "✓" } else { "✗" };
         let title = doc
             .title
-            .as_ref()
-            .map(|s| s.as_str())
+            .as_deref()
             .unwrap_or_else(|| doc.doc_path.to_str().unwrap_or("unknown"));
         println!("  {} {} ({})", status, title, doc.doc_path.display());
         for matched in &doc.matched_files {

@@ -38,6 +38,26 @@ pub struct ParsedDoc {
     pub frontmatter: Option<PaverFrontmatter>,
 }
 
+/// Strategy for matching expected output.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExpectMatchStrategy {
+    /// Match if output contains the expected string (default).
+    Contains,
+    /// Match if output matches the regex pattern.
+    Regex,
+    /// Match if output exactly equals expected (trimmed).
+    Exact,
+}
+
+/// Expected output specification for a code block.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExpectedOutput {
+    /// The expected output content.
+    pub content: String,
+    /// The matching strategy to use.
+    pub strategy: ExpectMatchStrategy,
+}
+
 /// A fenced code block extracted from a section.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CodeBlock {
@@ -49,6 +69,8 @@ pub struct CodeBlock {
     pub start_line: usize,
     /// Whether this code block contains executable shell commands.
     pub is_executable: bool,
+    /// Expected output for this code block, if specified.
+    pub expected_output: Option<ExpectedOutput>,
 }
 
 /// A section of a PAVED document (H2 heading and its content).
@@ -215,16 +237,18 @@ impl ParsedDoc {
     /// - Content between the fences
     /// - Line number of the opening fence
     /// - Whether the block is executable (shell language, prompts, or paver:run marker)
+    /// - Expected output (inline or from explicit blocks)
     ///
     /// The `base_line` parameter is the 1-indexed line number of the first line in `lines`.
     fn extract_code_blocks(lines: &[&str], base_line: usize) -> Vec<CodeBlock> {
-        let mut code_blocks = Vec::new();
+        let mut code_blocks: Vec<CodeBlock> = Vec::new();
         let mut in_code_block = false;
         let mut current_block_start: usize = 0;
         let mut current_language: Option<String> = None;
         let mut current_content: Vec<&str> = Vec::new();
         let mut opening_fence_len: usize = 0;
         let mut has_run_marker = false;
+        let mut pending_expect_marker: Option<ExpectMatchStrategy> = None;
 
         for (idx, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
@@ -233,6 +257,10 @@ impl ParsedDoc {
                 // Check for paver:run marker before the code block
                 if Self::has_paver_run_marker(trimmed) {
                     has_run_marker = true;
+                }
+                // Check for paver:expect marker before a code block
+                else if let Some(strategy) = Self::parse_expect_marker(trimmed) {
+                    pending_expect_marker = Some(strategy);
                 }
                 // Check for opening fence (at least 3 backticks)
                 else if let Some(fence_content) = Self::parse_opening_fence(trimmed) {
@@ -246,14 +274,36 @@ impl ParsedDoc {
                 // Check for closing fence (at least as many backticks as opening, nothing after)
                 if Self::is_closing_fence(trimmed, opening_fence_len) {
                     let content = current_content.join("\n");
-                    let is_executable =
-                        Self::is_block_executable(&current_language, &content, has_run_marker);
-                    code_blocks.push(CodeBlock {
-                        language: current_language.take(),
-                        content,
-                        start_line: current_block_start,
-                        is_executable,
-                    });
+
+                    // If there's a pending expect marker, this block is expected output
+                    if let Some(strategy) = pending_expect_marker.take() {
+                        // Attach expected output to the last executable block
+                        if let Some(last_block) = code_blocks.last_mut()
+                            && last_block.is_executable
+                            && last_block.expected_output.is_none()
+                        {
+                            last_block.expected_output = Some(ExpectedOutput {
+                                content: content.clone(),
+                                strategy,
+                            });
+                        }
+                        // This block is not added as a code block itself
+                    } else {
+                        let is_executable =
+                            Self::is_block_executable(&current_language, &content, has_run_marker);
+
+                        // Extract inline expected output from shell-style blocks
+                        let (command_content, inline_output) =
+                            Self::extract_inline_expected_output(&content);
+
+                        code_blocks.push(CodeBlock {
+                            language: current_language.take(),
+                            content: command_content,
+                            start_line: current_block_start,
+                            is_executable,
+                            expected_output: inline_output,
+                        });
+                    }
                     in_code_block = false;
                     current_content.clear();
                     has_run_marker = false;
@@ -268,11 +318,13 @@ impl ParsedDoc {
             let content = current_content.join("\n");
             let is_executable =
                 Self::is_block_executable(&current_language, &content, has_run_marker);
+            let (command_content, inline_output) = Self::extract_inline_expected_output(&content);
             code_blocks.push(CodeBlock {
                 language: current_language,
-                content,
+                content: command_content,
                 start_line: current_block_start,
                 is_executable,
+                expected_output: inline_output,
             });
         }
 
@@ -343,6 +395,112 @@ impl ParsedDoc {
     fn has_paver_run_marker(line: &str) -> bool {
         let trimmed = line.trim();
         trimmed.contains("<!-- paver:run -->") || trimmed.contains("<!--paver:run-->")
+    }
+
+    /// Parse a paver:expect marker and return the matching strategy.
+    ///
+    /// Supports:
+    /// - `<!-- paver:expect -->` or `<!-- paver:expect:contains -->` - contains matching (default)
+    /// - `<!-- paver:expect:regex -->` - regex matching
+    /// - `<!-- paver:expect:exact -->` - exact matching
+    fn parse_expect_marker(line: &str) -> Option<ExpectMatchStrategy> {
+        let trimmed = line.trim();
+
+        // Check for markers with and without spaces
+        let patterns = [
+            (
+                "<!-- paver:expect:contains -->",
+                ExpectMatchStrategy::Contains,
+            ),
+            (
+                "<!--paver:expect:contains-->",
+                ExpectMatchStrategy::Contains,
+            ),
+            ("<!-- paver:expect:regex -->", ExpectMatchStrategy::Regex),
+            ("<!--paver:expect:regex-->", ExpectMatchStrategy::Regex),
+            ("<!-- paver:expect:exact -->", ExpectMatchStrategy::Exact),
+            ("<!--paver:expect:exact-->", ExpectMatchStrategy::Exact),
+            ("<!-- paver:expect -->", ExpectMatchStrategy::Contains),
+            ("<!--paver:expect-->", ExpectMatchStrategy::Contains),
+        ];
+
+        for (pattern, strategy) in patterns {
+            if trimmed.contains(pattern) {
+                return Some(strategy);
+            }
+        }
+
+        None
+    }
+
+    /// Extract inline expected output from a code block with shell prompts.
+    ///
+    /// In a code block like:
+    /// ```bash
+    /// $ paver check
+    /// Checked 5 documents: all checks passed
+    /// ```
+    ///
+    /// The line after `$ paver check` (that doesn't start with `$`) is treated
+    /// as expected output using the `contains` strategy.
+    ///
+    /// This only applies to blocks that contain shell prompt lines (`$ ` or `> `).
+    /// Other blocks are returned unchanged.
+    ///
+    /// Returns (command_content, optional_expected_output).
+    fn extract_inline_expected_output(content: &str) -> (String, Option<ExpectedOutput>) {
+        // First, check if content has shell prompt lines
+        let has_shell_prompts = content.lines().any(|line| {
+            let trimmed = line.trim();
+            trimmed.starts_with("$ ") || trimmed.starts_with("> ")
+        });
+
+        // If no shell prompts, return content unchanged
+        if !has_shell_prompts {
+            return (content.to_string(), None);
+        }
+
+        let lines: Vec<&str> = content.lines().collect();
+
+        let mut command_lines = Vec::new();
+        let mut output_lines = Vec::new();
+        let mut seen_command = false;
+
+        for line in lines {
+            let trimmed = line.trim();
+
+            // Check if this is a shell prompt line
+            if trimmed.starts_with("$ ") || trimmed.starts_with("> ") {
+                command_lines.push(line);
+                seen_command = true;
+            } else if seen_command {
+                // Any non-command line after seeing a command is output
+                // Skip empty lines and comment lines at the start of output
+                if output_lines.is_empty() && (trimmed.is_empty() || trimmed.starts_with('#')) {
+                    continue;
+                }
+                output_lines.push(line);
+            } else {
+                // Line before any command - treat as part of content
+                command_lines.push(line);
+            }
+        }
+
+        let command_content = command_lines.join("\n");
+
+        // Only create expected output if we have non-empty output lines
+        let output_content: String = output_lines.to_vec().join("\n");
+
+        let expected_output = if !output_content.trim().is_empty() {
+            Some(ExpectedOutput {
+                content: output_content,
+                strategy: ExpectMatchStrategy::Contains,
+            })
+        } else {
+            None
+        };
+
+        (command_content, expected_output)
     }
 
     /// Extract paver frontmatter from document content.
@@ -1051,5 +1209,197 @@ Has paver section but empty paths.
         assert!(doc.frontmatter.is_some());
         let frontmatter = doc.frontmatter.unwrap();
         assert!(frontmatter.paths.is_empty());
+    }
+
+    #[test]
+    fn inline_expected_output_parsing() {
+        let content = r#"# Test
+
+## Verification
+```bash
+$ paver check
+Checked 5 documents: all checks passed
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let section = doc.get_section("Verification").unwrap();
+
+        assert_eq!(section.code_blocks.len(), 1);
+        let block = &section.code_blocks[0];
+        assert!(block.is_executable);
+        // Command should be extracted without the output
+        assert!(block.content.contains("$ paver check"));
+        assert!(!block.content.contains("Checked 5 documents"));
+        // Expected output should be captured
+        assert!(block.expected_output.is_some());
+        let expected = block.expected_output.as_ref().unwrap();
+        assert!(expected.content.contains("Checked 5 documents"));
+        assert_eq!(expected.strategy, ExpectMatchStrategy::Contains);
+    }
+
+    #[test]
+    fn explicit_expect_contains_marker() {
+        let content = r#"# Test
+
+## Verification
+```bash
+cargo test
+```
+<!-- paver:expect:contains -->
+```
+test result: ok
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let section = doc.get_section("Verification").unwrap();
+
+        // Only one code block should be returned (the expect block is consumed)
+        assert_eq!(section.code_blocks.len(), 1);
+        let block = &section.code_blocks[0];
+        assert!(block.is_executable);
+        assert!(block.expected_output.is_some());
+        let expected = block.expected_output.as_ref().unwrap();
+        assert!(expected.content.contains("test result: ok"));
+        assert_eq!(expected.strategy, ExpectMatchStrategy::Contains);
+    }
+
+    #[test]
+    fn explicit_expect_regex_marker() {
+        let content = r#"# Test
+
+## Verification
+```bash
+cargo test
+```
+<!-- paver:expect:regex -->
+```
+test result: ok\. \d+ passed
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let section = doc.get_section("Verification").unwrap();
+
+        assert_eq!(section.code_blocks.len(), 1);
+        let block = &section.code_blocks[0];
+        assert!(block.expected_output.is_some());
+        let expected = block.expected_output.as_ref().unwrap();
+        assert_eq!(expected.strategy, ExpectMatchStrategy::Regex);
+    }
+
+    #[test]
+    fn explicit_expect_exact_marker() {
+        let content = r#"# Test
+
+## Verification
+```bash
+echo hello
+```
+<!-- paver:expect:exact -->
+```
+hello
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let section = doc.get_section("Verification").unwrap();
+
+        assert_eq!(section.code_blocks.len(), 1);
+        let block = &section.code_blocks[0];
+        assert!(block.expected_output.is_some());
+        let expected = block.expected_output.as_ref().unwrap();
+        assert_eq!(expected.strategy, ExpectMatchStrategy::Exact);
+        assert_eq!(expected.content.trim(), "hello");
+    }
+
+    #[test]
+    fn expect_marker_without_spaces() {
+        let content = r#"# Test
+
+## Verification
+```bash
+echo test
+```
+<!--paver:expect:contains-->
+```
+test
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let section = doc.get_section("Verification").unwrap();
+
+        assert_eq!(section.code_blocks.len(), 1);
+        let block = &section.code_blocks[0];
+        assert!(block.expected_output.is_some());
+    }
+
+    #[test]
+    fn default_expect_marker_uses_contains() {
+        let content = r#"# Test
+
+## Verification
+```bash
+echo test
+```
+<!-- paver:expect -->
+```
+test
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let section = doc.get_section("Verification").unwrap();
+
+        assert_eq!(section.code_blocks.len(), 1);
+        let block = &section.code_blocks[0];
+        assert!(block.expected_output.is_some());
+        let expected = block.expected_output.as_ref().unwrap();
+        assert_eq!(expected.strategy, ExpectMatchStrategy::Contains);
+    }
+
+    #[test]
+    fn no_expected_output_for_non_shell_blocks() {
+        let content = r#"# Test
+
+## Example
+```rust
+fn main() {}
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let section = doc.get_section("Example").unwrap();
+
+        assert_eq!(section.code_blocks.len(), 1);
+        let block = &section.code_blocks[0];
+        assert!(block.expected_output.is_none());
+        assert!(block.content.contains("fn main()"));
+    }
+
+    #[test]
+    fn multiple_commands_without_inline_output() {
+        let content = r#"# Test
+
+## Verification
+```bash
+$ echo hello
+$ echo world
+```
+"#;
+
+        let doc = ParsedDoc::parse_content(PathBuf::from("test.md"), content).unwrap();
+        let section = doc.get_section("Verification").unwrap();
+
+        assert_eq!(section.code_blocks.len(), 1);
+        let block = &section.code_blocks[0];
+        assert!(block.is_executable);
+        // Both commands should be in content
+        assert!(block.content.contains("$ echo hello"));
+        assert!(block.content.contains("$ echo world"));
+        // No expected output since there's nothing after the commands
+        assert!(block.expected_output.is_none());
     }
 }

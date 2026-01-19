@@ -371,6 +371,7 @@ Missing verification.
             max_lines: 500,
             require_verification: true,
             require_examples: false,
+            strict_output_matching: false,
         };
         let engine = RulesEngine::from_config(&config);
 
