@@ -390,6 +390,8 @@ mod tests {
             strict_output_matching: false,
             skip_output_matching: false,
             type_specific: Default::default(),
+            validate_paths: false,
+            warn_empty_paths: false,
         };
 
         let formatted = format_rules(&rules);

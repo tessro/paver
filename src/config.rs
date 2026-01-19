@@ -76,6 +76,14 @@ pub struct RulesSection {
     /// When enabled, documents are validated against type-specific requirements.
     #[serde(default)]
     pub type_specific: TypeSpecificRulesSection,
+    /// Validate that patterns in ## Paths sections are valid glob syntax.
+    /// Also checks that paths are relative (not absolute).
+    #[serde(default)]
+    pub validate_paths: bool,
+    /// Warn if patterns in ## Paths sections match no files.
+    /// Requires validate_paths to be enabled.
+    #[serde(default)]
+    pub warn_empty_paths: bool,
 }
 
 /// Document-type-specific validation rules.
@@ -157,6 +165,8 @@ impl Default for RulesSection {
             strict_output_matching: false,
             skip_output_matching: false,
             type_specific: TypeSpecificRulesSection::default(),
+            validate_paths: false,
+            warn_empty_paths: false,
         }
     }
 }

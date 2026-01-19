@@ -5,6 +5,8 @@
 
 use std::path::{Path, PathBuf};
 
+use glob::Pattern;
+
 use crate::config::RulesSection;
 use crate::parser::ParsedDoc;
 
@@ -32,6 +34,14 @@ pub enum Rule {
     RequireOneOf { sections: Vec<String> },
     /// Require a section to contain a valid ADR status value.
     RequireValidAdrStatus,
+    /// Validate that paths in the Paths section are valid glob patterns.
+    /// If `warn_empty` is true, also warns when patterns match no files.
+    ValidatePaths {
+        /// The project root directory for checking if patterns match files.
+        project_root: PathBuf,
+        /// Whether to warn when patterns match no files.
+        warn_empty: bool,
+    },
 }
 
 impl Rule {
@@ -51,6 +61,7 @@ impl Rule {
                 format!("require-one-of-{}", names.join("-or-"))
             }
             Rule::RequireValidAdrStatus => "require-valid-adr-status".to_string(),
+            Rule::ValidatePaths { .. } => "validate-paths".to_string(),
         }
     }
 }
@@ -127,7 +138,17 @@ impl RulesEngine {
     }
 
     /// Creates a rules engine from the configuration.
+    ///
+    /// Uses the current directory as the project root for ValidatePaths rule.
     pub fn from_config(config: &RulesSection) -> Self {
+        Self::from_config_with_root(config, PathBuf::from("."))
+    }
+
+    /// Creates a rules engine from the configuration with a specified project root.
+    ///
+    /// The project root is used for ValidatePaths rule to check if patterns match files.
+    pub fn from_config_with_root(config: &RulesSection, project_root: impl Into<PathBuf>) -> Self {
+        let project_root = project_root.into();
         let mut rules = Vec::new();
 
         // Always require Purpose section (from PAVED framework)
@@ -163,6 +184,14 @@ impl RulesEngine {
         rules.push(Rule::MaxLines {
             limit: config.max_lines as usize,
         });
+
+        // ValidatePaths rule
+        if config.validate_paths {
+            rules.push(Rule::ValidatePaths {
+                project_root,
+                warn_empty: config.warn_empty_paths,
+            });
+        }
 
         Self { rules }
     }
@@ -302,7 +331,106 @@ impl RulesEngine {
                     }
                 }
             }
+            Rule::ValidatePaths {
+                project_root,
+                warn_empty,
+            } => {
+                if let Some(section) = doc.get_section("Paths") {
+                    let patterns = Self::extract_paths_patterns(&section.content);
+                    for (line_offset, pattern) in patterns {
+                        let line = section.start_line + line_offset;
+                        // Check for absolute paths
+                        if pattern.starts_with('/') {
+                            result.errors.push(ValidationError {
+                                rule: rule.name(),
+                                message: format!(
+                                    "path pattern '{}' is absolute; paths should be relative to project root",
+                                    pattern
+                                ),
+                                line: Some(line),
+                                suggestion: Some(format!(
+                                    "remove the leading '/' to make the path relative: '{}'",
+                                    pattern.trim_start_matches('/')
+                                )),
+                            });
+                            continue;
+                        }
+
+                        // Check for valid glob syntax
+                        if let Err(e) = Pattern::new(&pattern) {
+                            result.errors.push(ValidationError {
+                                rule: rule.name(),
+                                message: format!("invalid glob pattern '{}': {}", pattern, e),
+                                line: Some(line),
+                                suggestion: Some(
+                                    "check for unmatched brackets or invalid glob syntax"
+                                        .to_string(),
+                                ),
+                            });
+                            continue;
+                        }
+
+                        // Check if pattern matches any files (warning only)
+                        if *warn_empty && !Self::pattern_matches_files(&pattern, project_root) {
+                            result.warnings.push(ValidationWarning {
+                                rule: rule.name(),
+                                message: format!(
+                                    "path pattern '{}' matches no files in the project",
+                                    pattern
+                                ),
+                                line: Some(line),
+                            });
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    /// Extract path patterns from the Paths section content.
+    /// Returns pairs of (line_offset, pattern).
+    fn extract_paths_patterns(content: &str) -> Vec<(usize, String)> {
+        let mut patterns = Vec::new();
+
+        for (idx, line) in content.lines().enumerate() {
+            let trimmed = line.trim();
+
+            // Collect patterns (lines starting with - or *)
+            if let Some(pattern) = trimmed
+                .strip_prefix("- ")
+                .or_else(|| trimmed.strip_prefix("* "))
+            {
+                let pattern = pattern.trim();
+                // Remove backticks if present
+                let pattern = pattern.trim_matches('`');
+                if !pattern.is_empty() {
+                    // Line offset is idx + 1 since content starts after the heading
+                    patterns.push((idx + 1, pattern.to_string()));
+                }
+            }
+        }
+
+        patterns
+    }
+
+    /// Check if a glob pattern matches any files in the given directory.
+    fn pattern_matches_files(pattern: &str, root: &Path) -> bool {
+        // Build the full glob pattern from the root directory
+        let full_pattern = root.join(pattern);
+        let pattern_str = full_pattern.to_string_lossy();
+
+        // Try to match files using glob
+        if let Ok(paths) = glob::glob(&pattern_str) {
+            return paths.flatten().next().is_some();
+        }
+
+        // Also try simple prefix matching for directory patterns
+        if pattern.ends_with('/') || !pattern.contains('*') {
+            let target = root.join(pattern.trim_end_matches('/'));
+            return target.exists();
+        }
+
+        false
     }
 
     /// Returns the rules in this engine.
@@ -551,6 +679,8 @@ Missing verification.
             strict_output_matching: false,
             skip_output_matching: false,
             type_specific: Default::default(),
+            validate_paths: false,
+            warn_empty_paths: false,
         };
         let engine = RulesEngine::from_config(&config);
 
@@ -587,6 +717,8 @@ Missing verification.
             strict_output_matching: false,
             skip_output_matching: false,
             type_specific: Default::default(),
+            validate_paths: false,
+            warn_empty_paths: false,
         };
         let engine = RulesEngine::from_config(&config);
 
@@ -1059,5 +1191,294 @@ $ deploy.sh
             Rule::RequireValidAdrStatus.name(),
             "require-valid-adr-status"
         );
+    }
+
+    #[test]
+    fn validate_paths_rule_name() {
+        let rule = Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: false,
+        };
+        assert_eq!(rule.name(), "validate-paths");
+    }
+
+    #[test]
+    fn validate_paths_valid_patterns_pass() {
+        let content = r#"# Component
+
+## Purpose
+This is a component.
+
+## Paths
+- `src/*.rs`
+- `src/commands/*.rs`
+- `docs/**/*.md`
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: false,
+        }]);
+        let result = engine.validate(&doc);
+
+        assert!(result.is_valid(), "errors: {:?}", result.errors);
+    }
+
+    #[test]
+    fn validate_paths_invalid_glob_pattern_fails() {
+        let content = r#"# Component
+
+## Purpose
+This is a component.
+
+## Paths
+- `src/[broken`
+- `src/*.rs`
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: false,
+        }]);
+        let result = engine.validate(&doc);
+
+        assert!(!result.is_valid());
+        assert_eq!(result.errors.len(), 1);
+        assert!(result.errors[0].message.contains("invalid glob pattern"));
+        assert!(result.errors[0].message.contains("src/[broken"));
+    }
+
+    #[test]
+    fn validate_paths_absolute_path_fails() {
+        let content = r#"# Component
+
+## Purpose
+This is a component.
+
+## Paths
+- `/usr/local/bin/foo`
+- `src/*.rs`
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: false,
+        }]);
+        let result = engine.validate(&doc);
+
+        assert!(!result.is_valid());
+        assert_eq!(result.errors.len(), 1);
+        assert!(result.errors[0].message.contains("absolute"));
+        assert!(
+            result.errors[0]
+                .suggestion
+                .as_ref()
+                .unwrap()
+                .contains("usr/local/bin/foo")
+        );
+    }
+
+    #[test]
+    fn validate_paths_document_without_paths_section_passes() {
+        let content = r#"# Component
+
+## Purpose
+This is a component without paths.
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: false,
+        }]);
+        let result = engine.validate(&doc);
+
+        assert!(result.is_valid());
+    }
+
+    #[test]
+    fn validate_paths_warn_empty_creates_warning() {
+        let content = r#"# Component
+
+## Purpose
+This is a component.
+
+## Paths
+- `nonexistent/path/that/does/not/exist/*.xyz`
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: true,
+        }]);
+        let result = engine.validate(&doc);
+
+        // Should still be valid (warning, not error)
+        assert!(result.is_valid());
+        // Should have a warning
+        assert!(result.has_warnings());
+        assert!(result.warnings[0].message.contains("matches no files"));
+    }
+
+    #[test]
+    fn validate_paths_warn_empty_false_no_warning() {
+        let content = r#"# Component
+
+## Purpose
+This is a component.
+
+## Paths
+- `nonexistent/path/that/does/not/exist/*.xyz`
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: false,
+        }]);
+        let result = engine.validate(&doc);
+
+        assert!(result.is_valid());
+        assert!(!result.has_warnings());
+    }
+
+    #[test]
+    fn validate_paths_multiple_errors() {
+        let content = r#"# Component
+
+## Purpose
+This is a component.
+
+## Paths
+- `/absolute/path`
+- `src/[broken`
+- `src/*.rs`
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: false,
+        }]);
+        let result = engine.validate(&doc);
+
+        assert!(!result.is_valid());
+        assert_eq!(result.errors.len(), 2);
+        // One for absolute path, one for invalid glob
+        assert!(result.errors.iter().any(|e| e.message.contains("absolute")));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.message.contains("invalid glob"))
+        );
+    }
+
+    #[test]
+    fn validate_paths_with_asterisk_prefix() {
+        let content = r#"# Component
+
+## Purpose
+This is a component.
+
+## Paths
+* src/*.rs
+* docs/
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: false,
+        }]);
+        let result = engine.validate(&doc);
+
+        assert!(result.is_valid(), "errors: {:?}", result.errors);
+    }
+
+    #[test]
+    fn validate_paths_line_numbers_are_correct() {
+        let content = r#"# Component
+
+## Purpose
+This is a component.
+
+## Paths
+- `valid/*.rs`
+- `/invalid/absolute`
+"#;
+        let doc = parse_doc(content);
+        let engine = RulesEngine::new(vec![Rule::ValidatePaths {
+            project_root: PathBuf::from("."),
+            warn_empty: false,
+        }]);
+        let result = engine.validate(&doc);
+
+        assert!(!result.is_valid());
+        assert_eq!(result.errors.len(), 1);
+        // The error should have a line number
+        assert!(result.errors[0].line.is_some());
+    }
+
+    #[test]
+    fn rules_engine_from_config_with_validate_paths() {
+        let config = RulesSection {
+            max_lines: 300,
+            require_verification: false,
+            require_examples: false,
+            require_verification_commands: false,
+            strict_output_matching: false,
+            skip_output_matching: false,
+            type_specific: Default::default(),
+            validate_paths: true,
+            warn_empty_paths: true,
+        };
+        let engine = RulesEngine::from_config_with_root(&config, "/project/root");
+
+        // Should have: Purpose, MaxLines, ValidatePaths
+        assert_eq!(engine.rules().len(), 3);
+        assert!(engine.rules().iter().any(|r| matches!(
+            r,
+            Rule::ValidatePaths {
+                warn_empty: true,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn rules_engine_from_config_without_validate_paths() {
+        let config = RulesSection {
+            max_lines: 300,
+            require_verification: false,
+            require_examples: false,
+            require_verification_commands: false,
+            strict_output_matching: false,
+            skip_output_matching: false,
+            type_specific: Default::default(),
+            validate_paths: false,
+            warn_empty_paths: false,
+        };
+        let engine = RulesEngine::from_config(&config);
+
+        // Should have: Purpose, MaxLines (no ValidatePaths)
+        assert_eq!(engine.rules().len(), 2);
+        assert!(
+            !engine
+                .rules()
+                .iter()
+                .any(|r| matches!(r, Rule::ValidatePaths { .. }))
+        );
+    }
+
+    #[test]
+    fn extract_paths_patterns_helper() {
+        let content = r#"Some intro text.
+- `src/commands/*.rs`
+- `src/cli.rs`
+* docs/
+"#;
+        let patterns = RulesEngine::extract_paths_patterns(content);
+
+        assert_eq!(patterns.len(), 3);
+        assert_eq!(patterns[0], (2, "src/commands/*.rs".to_string()));
+        assert_eq!(patterns[1], (3, "src/cli.rs".to_string()));
+        assert_eq!(patterns[2], (4, "docs/".to_string()));
     }
 }
