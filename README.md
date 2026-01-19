@@ -1,7 +1,5 @@
 # paver
 
-> PAVED docs. You can read them, but they're not for you.
-
 A CLI tool for creating, validating, and managing documentation optimized for human+agent pairs.
 
 ## What is PAVED?
