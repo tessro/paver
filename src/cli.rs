@@ -91,7 +91,8 @@ pub enum Command {
     },
 
     /// Manage git hooks for documentation validation
-    Hooks,
+    #[command(subcommand)]
+    Hooks(HooksCommand),
 
     /// View or modify paver configuration
     #[command(subcommand)]
@@ -142,6 +143,47 @@ pub enum OutputFormat {
     Json,
     /// GitHub Actions annotation format
     Github,
+}
+
+/// Type of git hook to install.
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+pub enum HookType {
+    /// Run validation before commits.
+    #[default]
+    PreCommit,
+    /// Run validation before pushes.
+    PrePush,
+}
+
+impl HookType {
+    /// Returns the git hook filename.
+    pub fn filename(&self) -> &'static str {
+        match self {
+            HookType::PreCommit => "pre-commit",
+            HookType::PrePush => "pre-push",
+        }
+    }
+}
+
+#[derive(Subcommand)]
+pub enum HooksCommand {
+    /// Install git hooks for documentation validation
+    Install {
+        /// Which hook to install: pre-commit, pre-push
+        #[arg(long, value_enum, default_value = "pre-commit")]
+        hook: HookType,
+
+        /// Overwrite existing hooks
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Uninstall git hooks
+    Uninstall {
+        /// Which hook to uninstall
+        #[arg(long, value_enum, default_value = "pre-commit")]
+        hook: HookType,
+    },
 }
 
 impl From<DocType> for TemplateType {

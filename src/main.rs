@@ -1,8 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use paver::cli::{Cli, Command, ConfigCommand, DocType, PromptOutputFormat};
+use paver::cli::{Cli, Command, ConfigCommand, DocType, HooksCommand, PromptOutputFormat};
 use paver::commands::check::{self, CheckArgs};
 use paver::commands::config;
+use paver::commands::hooks;
 use paver::commands::index;
 use paver::commands::init;
 use paver::commands::new::{self, NewArgs};
@@ -71,9 +72,14 @@ fn main() -> Result<()> {
             let prompt = generate_prompt(&options)?;
             print!("{}", prompt);
         }
-        Command::Hooks => {
-            println!("paver hooks: not yet implemented");
-        }
+        Command::Hooks(cmd) => match cmd {
+            HooksCommand::Install { hook, force } => {
+                hooks::install(hook, force)?;
+            }
+            HooksCommand::Uninstall { hook } => {
+                hooks::uninstall(hook)?;
+            }
+        },
         Command::Config(cmd) => match cmd {
             ConfigCommand::Get { key } => {
                 config::get(&key)?;
