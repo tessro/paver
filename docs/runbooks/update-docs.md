@@ -94,13 +94,11 @@ git checkout -- docs/path/to/file.md
 Confirm documentation is correct:
 
 ```bash
-$ cargo run -- check 2>&1 | head -1
-Checking PAVED documentation...
+./target/release/paver check
 ```
 
 ```bash
-$ cargo test --quiet 2>&1 | tail -1
-test result: ok.
+cargo test 2>&1 | grep "test result: ok" | head -1
 ```
 
 ## Escalation

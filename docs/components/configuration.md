@@ -103,13 +103,13 @@ Exclude patterns support glob syntax:
 Verify configuration is loaded correctly:
 
 ```bash
-cargo run -- config path
+./target/release/paver config path
 ```
 
 Check that configuration is used by other commands:
 
 ```bash
-cargo run -- check docs/index.md
+./target/release/paver check docs/index.md
 ```
 
 ## Examples

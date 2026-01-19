@@ -91,13 +91,13 @@ The `## Paths` section is parsed from any markdown document in the docs director
 Check that code mapping detects impacted docs:
 
 ```bash
-cargo run -- changed --base HEAD~1
+./target/release/paver changed --base HEAD~1
 ```
 
 Verify JSON output format works:
 
 ```bash
-cargo run -- changed --base HEAD~1 --format json | head -1
+./target/release/paver changed --base HEAD~1 --format json | head -1
 ```
 
 ## Examples

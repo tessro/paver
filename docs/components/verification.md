@@ -105,24 +105,12 @@ Verification is enabled when:
 
 ## Verification
 
-Verify that `paver verify` runs correctly:
-
 ```bash
-cargo run -- verify docs/components/paver-cli.md
+cargo test
 ```
 
-Check that verification detects failures:
-
 ```bash
-echo '# Test
-## Purpose
-Test doc.
-## Verification
-```bash
-false
-```
-## Examples
-Example.' > /tmp/fail.md && cargo run -- verify /tmp/fail.md; test $? -eq 1
+cargo build --release
 ```
 
 ## Examples

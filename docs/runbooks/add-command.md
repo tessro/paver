@@ -151,7 +151,7 @@ Validate PAVED documentation:
 Verify help text appears correctly:
 
 ```bash
-./target/debug/paver --help
+./target/release/paver --help
 ```
 
 ## Examples

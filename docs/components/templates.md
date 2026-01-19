@@ -57,7 +57,7 @@ The config schema includes fields for future custom template support (`docs.temp
 Verify templates are working:
 
 ```bash
-cargo run -- new component test-template --output /tmp/test-component.md && cat /tmp/test-component.md | grep "## Purpose" && rm /tmp/test-component.md
+./target/release/paver new component test-template --output /tmp/test-component.md && grep "## Purpose" /tmp/test-component.md && rm /tmp/test-component.md
 ```
 
 Verify all template types have required sections:

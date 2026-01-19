@@ -82,19 +82,19 @@ No additional configuration is required. If `.paver.toml` doesn't exist, default
 Generate a prompt for a new component:
 
 ```bash
-cargo run -- prompt component --for "auth service"
+./target/release/paver prompt component --for "auth service"
 ```
 
 Verify the prompt includes required sections:
 
 ```bash
-cargo run -- prompt component --for "test" | grep -q "## PAVED Structure"
+./target/release/paver prompt component --for "test" | grep -q "## PAVED Structure"
 ```
 
 Generate JSON output and verify structure:
 
 ```bash
-cargo run -- prompt component --for "test" --output json | jq -e '.prompt and .template and .rules'
+./target/release/paver prompt component --for "test" --output json | jq -e '.prompt and .template and .rules'
 ```
 
 Run the unit tests:
