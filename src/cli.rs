@@ -240,6 +240,17 @@ pub enum Command {
         #[arg(long)]
         external_links: bool,
     },
+
+    /// Diagnose documentation setup and identify issues
+    Doctor {
+        /// Specific files or directories to analyze [default: docs root from config]
+        #[arg()]
+        paths: Vec<PathBuf>,
+
+        /// Output format: text, json, github
+        #[arg(long, default_value = "text", value_enum)]
+        format: OutputFormat,
+    },
 }
 
 /// Output format for the `paver changed` command.

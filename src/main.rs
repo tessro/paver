@@ -7,8 +7,9 @@ use paver::commands::adopt::{self, AdoptArgs};
 use paver::commands::build;
 use paver::commands::changed::{self, ChangedArgs};
 use paver::commands::check::{self, CheckArgs};
-use paver::commands::coverage::{self, CoverageArgs};
 use paver::commands::config;
+use paver::commands::coverage::{self, CoverageArgs};
+use paver::commands::doctor::{self, DoctorArgs};
 use paver::commands::hooks;
 use paver::commands::index;
 use paver::commands::init;
@@ -194,6 +195,9 @@ fn main() -> Result<()> {
                 rules,
                 external_links,
             })?;
+        }
+        Command::Doctor { paths, format } => {
+            doctor::execute(DoctorArgs { paths, format })?;
         }
     }
 

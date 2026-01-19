@@ -37,13 +37,18 @@ pub fn execute(args: BuildArgs) -> Result<()> {
 
     // Clean output directory if it exists
     if output_dir.exists() {
-        fs::remove_dir_all(output_dir)
-            .with_context(|| format!("failed to clean output directory: {}", output_dir.display()))?;
+        fs::remove_dir_all(output_dir).with_context(|| {
+            format!("failed to clean output directory: {}", output_dir.display())
+        })?;
     }
 
     // Create output directory
-    fs::create_dir_all(output_dir)
-        .with_context(|| format!("failed to create output directory: {}", output_dir.display()))?;
+    fs::create_dir_all(output_dir).with_context(|| {
+        format!(
+            "failed to create output directory: {}",
+            output_dir.display()
+        )
+    })?;
 
     // Step 1: Copy site source files (assets, index.html, etc.)
     copy_site_source(&site_source, output_dir)?;
@@ -140,8 +145,9 @@ where
             copy_dir_recursive(&src_path, &dest_path, filter)?;
         }
     } else {
-        fs::copy(source, dest)
-            .with_context(|| format!("failed to copy {} to {}", source.display(), dest.display()))?;
+        fs::copy(source, dest).with_context(|| {
+            format!("failed to copy {} to {}", source.display(), dest.display())
+        })?;
     }
 
     Ok(())
@@ -202,9 +208,7 @@ fn process_markdown(content: &str, path: &Path) -> Result<String> {
 fn convert_md_links(content: &str) -> String {
     // Replace .md) with /) for simple links
     // Replace .md#anchor) with /#anchor) for links with anchors
-    content
-        .replace(".md)", "/)")
-        .replace(".md#", "/#")
+    content.replace(".md)", "/)").replace(".md#", "/#")
 }
 
 /// Extract the title from the first # heading.
@@ -280,7 +284,11 @@ fn process_html_file(
         .map(|s| s.as_str())
         .unwrap_or("default");
 
-    let template = if layout == "doc" { doc_layout } else { default_layout };
+    let template = if layout == "doc" {
+        doc_layout
+    } else {
+        default_layout
+    };
 
     // Get title for page
     let title = front_matter
@@ -323,7 +331,11 @@ fn convert_md_to_html(
         .map(|s| s.as_str())
         .unwrap_or("default");
 
-    let template = if layout == "doc" { doc_layout } else { default_layout };
+    let template = if layout == "doc" {
+        doc_layout
+    } else {
+        default_layout
+    };
 
     // Get title for page
     let title = front_matter
@@ -338,7 +350,10 @@ fn convert_md_to_html(
     // Write HTML file
     // For index.md, create index.html in same directory
     // For other files, create a directory with index.html for pretty URLs
-    let file_stem = md_path.file_stem().and_then(|s| s.to_str()).unwrap_or("index");
+    let file_stem = md_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("index");
 
     let html_path = if file_stem == "index" {
         md_path.with_extension("html")
@@ -407,7 +422,9 @@ fn apply_template(
     let base_path = if relative_depth == 0 {
         ".".to_string()
     } else {
-        std::iter::repeat("..").take(relative_depth).collect::<Vec<_>>().join("/")
+        std::iter::repeat_n("..", relative_depth)
+            .collect::<Vec<_>>()
+            .join("/")
     };
 
     let mut result = template.to_string();
@@ -425,21 +442,63 @@ fn apply_template(
     result = replace_title_block(&result, &title_replacement);
 
     // Replace asset URLs
-    result = result.replace("{{ '/assets/css/style.css' | relative_url }}", &format!("{}/assets/css/style.css", base_path));
-    result = result.replace("{{ '/assets/images/favicon.svg' | relative_url }}", &format!("{}/assets/images/favicon.svg", base_path));
+    result = result.replace(
+        "{{ '/assets/css/style.css' | relative_url }}",
+        &format!("{}/assets/css/style.css", base_path),
+    );
+    result = result.replace(
+        "{{ '/assets/images/favicon.svg' | relative_url }}",
+        &format!("{}/assets/images/favicon.svg", base_path),
+    );
     result = result.replace("{{ '/' | relative_url }}", &format!("{}/", base_path));
-    result = result.replace("{{ '/docs/' | relative_url }}", &format!("{}/docs/", base_path));
-    result = result.replace("{{ '/paved-docs/' | relative_url }}", &format!("{}/paved-docs/", base_path));
-    result = result.replace("{{ '/docs/manifesto/' | relative_url }}", &format!("{}/docs/manifesto/", base_path));
-    result = result.replace("{{ '/docs/getting-started/' | relative_url }}", &format!("{}/docs/getting-started/", base_path));
-    result = result.replace("{{ '/docs/commands/' | relative_url }}", &format!("{}/docs/commands/", base_path));
-    result = result.replace("{{ '/paved-docs/manifesto/' | relative_url }}", &format!("{}/paved-docs/manifesto/", base_path));
-    result = result.replace("{{ '/paved-docs/components/paver-cli/' | relative_url }}", &format!("{}/paved-docs/components/paver-cli/", base_path));
-    result = result.replace("{{ '/paved-docs/components/validation-engine/' | relative_url }}", &format!("{}/paved-docs/components/validation-engine/", base_path));
-    result = result.replace("{{ '/paved-docs/runbooks/add-command/' | relative_url }}", &format!("{}/paved-docs/runbooks/add-command/", base_path));
-    result = result.replace("{{ '/paved-docs/runbooks/release/' | relative_url }}", &format!("{}/paved-docs/runbooks/release/", base_path));
-    result = result.replace("{{ '/paved-docs/adrs/001-use-paved-framework/' | relative_url }}", &format!("{}/paved-docs/adrs/001-use-paved-framework/", base_path));
-    result = result.replace("{{ '/paved-docs/adrs/002-use-rust/' | relative_url }}", &format!("{}/paved-docs/adrs/002-use-rust/", base_path));
+    result = result.replace(
+        "{{ '/docs/' | relative_url }}",
+        &format!("{}/docs/", base_path),
+    );
+    result = result.replace(
+        "{{ '/paved-docs/' | relative_url }}",
+        &format!("{}/paved-docs/", base_path),
+    );
+    result = result.replace(
+        "{{ '/docs/manifesto/' | relative_url }}",
+        &format!("{}/docs/manifesto/", base_path),
+    );
+    result = result.replace(
+        "{{ '/docs/getting-started/' | relative_url }}",
+        &format!("{}/docs/getting-started/", base_path),
+    );
+    result = result.replace(
+        "{{ '/docs/commands/' | relative_url }}",
+        &format!("{}/docs/commands/", base_path),
+    );
+    result = result.replace(
+        "{{ '/paved-docs/manifesto/' | relative_url }}",
+        &format!("{}/paved-docs/manifesto/", base_path),
+    );
+    result = result.replace(
+        "{{ '/paved-docs/components/paver-cli/' | relative_url }}",
+        &format!("{}/paved-docs/components/paver-cli/", base_path),
+    );
+    result = result.replace(
+        "{{ '/paved-docs/components/validation-engine/' | relative_url }}",
+        &format!("{}/paved-docs/components/validation-engine/", base_path),
+    );
+    result = result.replace(
+        "{{ '/paved-docs/runbooks/add-command/' | relative_url }}",
+        &format!("{}/paved-docs/runbooks/add-command/", base_path),
+    );
+    result = result.replace(
+        "{{ '/paved-docs/runbooks/release/' | relative_url }}",
+        &format!("{}/paved-docs/runbooks/release/", base_path),
+    );
+    result = result.replace(
+        "{{ '/paved-docs/adrs/001-use-paved-framework/' | relative_url }}",
+        &format!("{}/paved-docs/adrs/001-use-paved-framework/", base_path),
+    );
+    result = result.replace(
+        "{{ '/paved-docs/adrs/002-use-rust/' | relative_url }}",
+        &format!("{}/paved-docs/adrs/002-use-rust/", base_path),
+    );
 
     // Replace site variables
     result = result.replace("{{ site.title }}", "paver");
@@ -499,12 +558,18 @@ mod tests {
     fn test_convert_md_links() {
         let content = "See [getting started](./getting-started.md) for more.";
         let result = convert_md_links(content);
-        assert_eq!(result, "See [getting started](./getting-started/) for more.");
+        assert_eq!(
+            result,
+            "See [getting started](./getting-started/) for more."
+        );
 
         // Test links with anchors
         let content_with_anchor = "See [section](./doc.md#section) for more.";
         let result_with_anchor = convert_md_links(content_with_anchor);
-        assert_eq!(result_with_anchor, "See [section](./doc/#section) for more.");
+        assert_eq!(
+            result_with_anchor,
+            "See [section](./doc/#section) for more."
+        );
     }
 
     #[test]
