@@ -12,6 +12,7 @@ use paver::commands::config;
 use paver::commands::hooks;
 use paver::commands::index;
 use paver::commands::init;
+use paver::commands::lint::{self, LintArgs};
 use paver::commands::new::{self, NewArgs};
 use paver::commands::prompt::{generate_prompt, OutputFormat, PromptOptions};
 use paver::commands::verify::{self, VerifyArgs};
@@ -175,6 +176,21 @@ fn main() -> Result<()> {
                 threshold,
                 include,
                 exclude,
+            })?;
+        }
+        Command::Lint {
+            paths,
+            format,
+            fix,
+            rules,
+            external_links,
+        } => {
+            lint::execute(LintArgs {
+                paths,
+                format,
+                fix,
+                rules,
+                external_links,
             })?;
         }
     }

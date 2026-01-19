@@ -9,6 +9,7 @@ pub mod coverage;
 pub mod hooks;
 pub mod index;
 pub mod init;
+pub mod lint;
 pub mod new;
 pub mod prompt;
 pub mod verify;

@@ -213,6 +213,29 @@ pub enum Command {
         #[arg(long = "exclude", value_name = "PATTERN")]
         exclude: Vec<String>,
     },
+
+    /// Check prose quality (links, references, style)
+    Lint {
+        /// Specific files or directories to lint [default: docs root from config]
+        #[arg()]
+        paths: Vec<PathBuf>,
+
+        /// Output format: text, json, github
+        #[arg(long, default_value = "text", value_enum)]
+        format: OutputFormat,
+
+        /// Auto-fix simple issues
+        #[arg(long)]
+        fix: bool,
+
+        /// Only run these rules (comma-separated)
+        #[arg(long)]
+        rules: Option<String>,
+
+        /// Check external link validity (slow)
+        #[arg(long)]
+        external_links: bool,
+    },
 }
 
 /// Output format for the `paver changed` command.

@@ -29,6 +29,9 @@ pub struct PaverConfig {
     /// Git hooks configuration.
     #[serde(default)]
     pub hooks: HooksSection,
+    /// Lint configuration.
+    #[serde(default)]
+    pub lint: LintSection,
 }
 
 /// Paver tool metadata section.
@@ -128,6 +131,38 @@ pub struct HooksSection {
     /// Run paver verify in hooks (default: false).
     #[serde(default)]
     pub run_verify: bool,
+}
+
+/// Lint configuration section.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LintSection {
+    /// Rules to enable (default: all rules enabled).
+    #[serde(default)]
+    pub enable: Vec<String>,
+    /// Rules to disable.
+    #[serde(default)]
+    pub disable: Vec<String>,
+    /// Maximum words per paragraph before warning.
+    #[serde(default = "default_max_paragraph_words")]
+    pub max_paragraph_words: u32,
+    /// Check external links (slow, off by default).
+    #[serde(default)]
+    pub external_links: bool,
+}
+
+fn default_max_paragraph_words() -> u32 {
+    150
+}
+
+impl Default for LintSection {
+    fn default() -> Self {
+        Self {
+            enable: Vec::new(),
+            disable: Vec::new(),
+            max_paragraph_words: default_max_paragraph_words(),
+            external_links: false,
+        }
+    }
 }
 
 fn default_max_lines() -> u32 {
