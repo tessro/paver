@@ -77,9 +77,13 @@ pub enum Command {
         #[arg(long, default_value = "text", value_enum)]
         format: OutputFormat,
 
-        /// Treat warnings as errors
+        /// Treat warnings as errors (overrides gradual mode)
         #[arg(long)]
         strict: bool,
+
+        /// Force gradual mode (treat errors as warnings, exit 0)
+        #[arg(long)]
+        gradual: bool,
 
         /// Only check docs changed since base ref
         #[arg(long)]

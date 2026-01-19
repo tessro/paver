@@ -392,6 +392,8 @@ mod tests {
             type_specific: Default::default(),
             validate_paths: false,
             warn_empty_paths: false,
+            gradual: false,
+            gradual_until: None,
         };
 
         let formatted = format_rules(&rules);

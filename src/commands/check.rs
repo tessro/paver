@@ -18,8 +18,10 @@ pub struct CheckArgs {
     pub paths: Vec<PathBuf>,
     /// Output format.
     pub format: OutputFormat,
-    /// Treat warnings as errors.
+    /// Treat warnings as errors (overrides gradual mode).
     pub strict: bool,
+    /// Force gradual mode (treat errors as warnings, exit 0).
+    pub gradual: bool,
     /// Only check docs changed since base ref.
     pub changed: bool,
     /// Base ref for --changed comparison.
@@ -48,6 +50,10 @@ pub struct Issue {
     /// Hint for fixing the issue.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hint: Option<String>,
+    /// Whether this issue was converted from an error (in gradual mode).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default)]
+    pub converted_from_error: bool,
 }
 
 /// Results of checking documents.
@@ -59,6 +65,10 @@ pub struct CheckResults {
     pub errors: Vec<Issue>,
     /// List of warnings found.
     pub warnings: Vec<Issue>,
+    /// Number of issues that would be errors outside gradual mode.
+    /// Only populated when gradual mode is active.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub would_fail_count: Option<usize>,
 }
 
 impl CheckResults {
@@ -67,6 +77,7 @@ impl CheckResults {
             files_checked: 0,
             errors: Vec::new(),
             warnings: Vec::new(),
+            would_fail_count: None,
         }
     }
 
@@ -85,6 +96,118 @@ impl CheckResults {
             self.errors.is_empty()
         }
     }
+}
+
+/// Check if the gradual deadline has passed.
+/// Returns true if the deadline has passed (gradual mode should be disabled).
+fn is_gradual_deadline_passed(deadline: &str) -> bool {
+    // Parse the deadline date (YYYY-MM-DD format)
+    let parts: Vec<&str> = deadline.split('-').collect();
+    if parts.len() != 3 {
+        eprintln!(
+            "Warning: Invalid gradual_until format '{}'. Expected YYYY-MM-DD. Ignoring deadline.",
+            deadline
+        );
+        return false;
+    }
+
+    let year: i32 = match parts[0].parse() {
+        Ok(y) => y,
+        Err(_) => {
+            eprintln!(
+                "Warning: Invalid year in gradual_until '{}'. Ignoring deadline.",
+                deadline
+            );
+            return false;
+        }
+    };
+
+    let month: u32 = match parts[1].parse() {
+        Ok(m) if (1..=12).contains(&m) => m,
+        _ => {
+            eprintln!(
+                "Warning: Invalid month in gradual_until '{}'. Ignoring deadline.",
+                deadline
+            );
+            return false;
+        }
+    };
+
+    let day: u32 = match parts[2].parse() {
+        Ok(d) if (1..=31).contains(&d) => d,
+        _ => {
+            eprintln!(
+                "Warning: Invalid day in gradual_until '{}'. Ignoring deadline.",
+                deadline
+            );
+            return false;
+        }
+    };
+
+    // Get current date using std::time
+    // We need to compare dates, so we'll get the current date from SystemTime
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // Convert deadline to seconds since epoch (approximate, days since epoch * seconds per day)
+    // Days from year 1970 to deadline year
+    let mut deadline_days: i64 = 0;
+    for y in 1970..year {
+        deadline_days += if is_leap_year(y) { 366 } else { 365 };
+    }
+
+    // Add days for months in deadline year
+    let days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    for m in 1..month {
+        deadline_days += days_in_month[(m - 1) as usize] as i64;
+        if m == 2 && is_leap_year(year) {
+            deadline_days += 1;
+        }
+    }
+    deadline_days += day as i64;
+
+    let deadline_secs = deadline_days * 86400;
+    let now_days = now as i64 / 86400;
+    let deadline_days_from_epoch = deadline_secs / 86400;
+
+    now_days > deadline_days_from_epoch
+}
+
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
+/// Determine if gradual mode is active based on config, CLI flags, and deadline.
+fn is_gradual_mode_active(config: &PaverConfig, args: &CheckArgs) -> bool {
+    // --strict always disables gradual mode
+    if args.strict {
+        return false;
+    }
+
+    // --gradual flag always enables gradual mode
+    if args.gradual {
+        return true;
+    }
+
+    // Check config
+    if config.rules.gradual {
+        // Check deadline if specified
+        if let Some(ref deadline) = config.rules.gradual_until
+            && is_gradual_deadline_passed(deadline)
+        {
+            eprintln!(
+                "Note: Gradual mode deadline ({}) has passed. Running in strict mode.",
+                deadline
+            );
+            return false;
+        }
+        return true;
+    }
+
+    false
 }
 
 /// Execute the `paver check` command.
@@ -135,15 +258,32 @@ pub fn execute(args: CheckArgs) -> Result<()> {
     }
     results.files_checked = files.len();
 
+    // Determine if gradual mode is active
+    let gradual_mode = is_gradual_mode_active(&config, &args);
+
+    // In gradual mode, convert errors to warnings
+    if gradual_mode && !results.errors.is_empty() {
+        let error_count = results.errors.len();
+        results.would_fail_count = Some(error_count);
+
+        // Convert all errors to warnings and mark them as converted
+        for mut error in results.errors.drain(..) {
+            error.severity = Severity::Warning;
+            error.converted_from_error = true;
+            results.warnings.push(error);
+        }
+    }
+
     // Output results in the requested format
     match args.format {
-        OutputFormat::Text => output_text(&results),
+        OutputFormat::Text => output_text(&results, gradual_mode),
         OutputFormat::Json => output_json(&results)?,
-        OutputFormat::Github => output_github(&results),
+        OutputFormat::Github => output_github(&results, gradual_mode),
     }
 
     // Return error if checks failed
-    if results.is_success(args.strict) {
+    // In gradual mode, always return success (exit 0)
+    if gradual_mode || results.is_success(args.strict) {
         Ok(())
     } else {
         let error_count = results.errors.len();
@@ -323,6 +463,7 @@ fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> 
                 config.rules.max_lines, doc.line_count
             ),
             hint: Some("Consider splitting into smaller, focused documents".to_string()),
+            converted_from_error: false,
         });
     }
 
@@ -334,6 +475,7 @@ fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> 
             severity: Severity::Error,
             message: "Missing required section 'Verification'".to_string(),
             hint: Some("Add a '## Verification' section with test commands".to_string()),
+            converted_from_error: false,
         });
     }
 
@@ -345,6 +487,7 @@ fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> 
             severity: Severity::Error,
             message: "Missing required section 'Examples'".to_string(),
             hint: Some("Add an '## Examples' section with concrete usage examples".to_string()),
+            converted_from_error: false,
         });
     }
 
@@ -363,6 +506,7 @@ fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> 
                 severity: Severity::Error,
                 message: error.message,
                 hint: error.suggestion,
+                converted_from_error: false,
             });
         }
 
@@ -373,6 +517,7 @@ fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> 
                 severity: Severity::Warning,
                 message: warning.message,
                 hint: None,
+                converted_from_error: false,
             });
         }
     }
@@ -381,7 +526,7 @@ fn check_file(path: &Path, config: &PaverConfig, results: &mut CheckResults) -> 
 }
 
 /// Output results in text format.
-fn output_text(results: &CheckResults) {
+fn output_text(results: &CheckResults, gradual_mode: bool) {
     // Print all issues
     for issue in results.errors.iter().chain(results.warnings.iter()) {
         let severity = match issue.severity {
@@ -398,6 +543,10 @@ fn output_text(results: &CheckResults) {
         if let Some(hint) = &issue.hint {
             println!("  hint: {}", hint);
         }
+        // Show note only for issues converted from errors in gradual mode
+        if issue.converted_from_error {
+            println!("  note: This would be an error outside gradual mode");
+        }
         println!();
     }
 
@@ -413,6 +562,14 @@ fn output_text(results: &CheckResults) {
 
     if error_count == 0 && warning_count == 0 {
         println!("all checks passed");
+    } else if gradual_mode {
+        println!(
+            "{} error{}, {} warning{} (gradual mode active)",
+            error_count,
+            if error_count == 1 { "" } else { "s" },
+            warning_count,
+            if warning_count == 1 { "" } else { "s" }
+        );
     } else {
         println!(
             "{} error{}, {} warning{}",
@@ -420,6 +577,15 @@ fn output_text(results: &CheckResults) {
             if error_count == 1 { "" } else { "s" },
             warning_count,
             if warning_count == 1 { "" } else { "s" }
+        );
+    }
+
+    // In gradual mode, show how many issues would fail in strict mode
+    if let Some(would_fail) = results.would_fail_count {
+        println!(
+            "Note: {} issue{} would fail in strict mode. Run 'paver check --strict' to see.",
+            would_fail,
+            if would_fail == 1 { "" } else { "s" }
         );
     }
 }
@@ -432,18 +598,31 @@ fn output_json(results: &CheckResults) -> Result<()> {
 }
 
 /// Output results in GitHub Actions annotation format.
-fn output_github(results: &CheckResults) {
+fn output_github(results: &CheckResults, _gradual_mode: bool) {
     for issue in results.errors.iter().chain(results.warnings.iter()) {
         let level = match issue.severity {
             Severity::Error => "error",
             Severity::Warning => "warning",
+        };
+        let message = if issue.converted_from_error {
+            format!("{} (would be error outside gradual mode)", issue.message)
+        } else {
+            issue.message.clone()
         };
         println!(
             "::{} file={},line={}::{}",
             level,
             issue.file.display(),
             issue.line,
-            issue.message
+            message
+        );
+    }
+
+    // Print summary notice in gradual mode
+    if let Some(would_fail) = results.would_fail_count {
+        println!(
+            "::notice::Gradual mode active: {} issue(s) would fail in strict mode",
+            would_fail
         );
     }
 }
@@ -614,6 +793,7 @@ This document is missing required sections.
             severity: Severity::Warning,
             message: "A warning".to_string(),
             hint: None,
+            converted_from_error: false,
         });
 
         assert!(results.is_success(false)); // Warnings OK without strict
@@ -629,6 +809,7 @@ This document is missing required sections.
             severity: Severity::Error,
             message: "An error".to_string(),
             hint: None,
+            converted_from_error: false,
         });
 
         assert!(!results.is_success(false));
@@ -645,6 +826,7 @@ This document is missing required sections.
             severity: Severity::Error,
             message: "Test error".to_string(),
             hint: Some("Fix it".to_string()),
+            converted_from_error: false,
         });
 
         let json = serde_json::to_string(&results).unwrap();
@@ -1122,5 +1304,183 @@ $ run.sh
 
         // Should pass - generic docs don't need type-specific sections
         assert!(results.errors.is_empty(), "errors: {:?}", results.errors);
+    }
+
+    fn create_test_config_with_gradual_mode(temp_dir: &TempDir, gradual: bool) -> PathBuf {
+        let config_content = format!(
+            r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+
+[rules]
+max_lines = 50
+require_verification = true
+require_examples = true
+gradual = {}
+"#,
+            gradual
+        );
+        let config_path = temp_dir.path().join(".paver.toml");
+        fs::write(&config_path, config_content).unwrap();
+        config_path
+    }
+
+    fn create_test_config_with_gradual_until(
+        temp_dir: &TempDir,
+        gradual_until: &str,
+    ) -> PathBuf {
+        let config_content = format!(
+            r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+
+[rules]
+max_lines = 50
+require_verification = true
+require_examples = true
+gradual = true
+gradual_until = "{}"
+"#,
+            gradual_until
+        );
+        let config_path = temp_dir.path().join(".paver.toml");
+        fs::write(&config_path, config_content).unwrap();
+        config_path
+    }
+
+    #[test]
+    fn gradual_mode_converts_errors_to_warnings() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_gradual_mode(&temp_dir, true);
+        let doc_path = create_invalid_doc(&temp_dir, "invalid.md");
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let mut results = CheckResults::new();
+        check_file(&doc_path, &config, &mut results).unwrap();
+
+        // Should have errors initially
+        let error_count = results.errors.len();
+        assert!(error_count > 0, "Expected errors for invalid doc");
+
+        // Simulate gradual mode conversion
+        let args = CheckArgs {
+            paths: vec![],
+            format: OutputFormat::Text,
+            strict: false,
+            gradual: false,
+            changed: false,
+            base: None,
+        };
+
+        assert!(is_gradual_mode_active(&config, &args));
+
+        // Convert errors to warnings (simulating execute behavior)
+        results.would_fail_count = Some(error_count);
+        for mut error in results.errors.drain(..) {
+            error.severity = Severity::Warning;
+            results.warnings.push(error);
+        }
+
+        assert!(results.errors.is_empty());
+        assert!(!results.warnings.is_empty());
+        assert_eq!(results.would_fail_count, Some(error_count));
+    }
+
+    #[test]
+    fn strict_flag_overrides_gradual_mode() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_gradual_mode(&temp_dir, true);
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let args = CheckArgs {
+            paths: vec![],
+            format: OutputFormat::Text,
+            strict: true, // This should override gradual
+            gradual: false,
+            changed: false,
+            base: None,
+        };
+
+        assert!(!is_gradual_mode_active(&config, &args));
+    }
+
+    #[test]
+    fn gradual_flag_enables_gradual_mode() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = create_test_config_with_gradual_mode(&temp_dir, false); // Config has gradual=false
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let args = CheckArgs {
+            paths: vec![],
+            format: OutputFormat::Text,
+            strict: false,
+            gradual: true, // CLI flag should enable gradual mode
+            changed: false,
+            base: None,
+        };
+
+        assert!(is_gradual_mode_active(&config, &args));
+    }
+
+    #[test]
+    fn gradual_until_future_date_enables_gradual_mode() {
+        let temp_dir = TempDir::new().unwrap();
+        // Use a date far in the future
+        let config_path = create_test_config_with_gradual_until(&temp_dir, "2099-12-31");
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let args = CheckArgs {
+            paths: vec![],
+            format: OutputFormat::Text,
+            strict: false,
+            gradual: false,
+            changed: false,
+            base: None,
+        };
+
+        assert!(is_gradual_mode_active(&config, &args));
+    }
+
+    #[test]
+    fn gradual_until_past_date_disables_gradual_mode() {
+        let temp_dir = TempDir::new().unwrap();
+        // Use a date in the past
+        let config_path = create_test_config_with_gradual_until(&temp_dir, "2020-01-01");
+
+        let config = PaverConfig::load(&config_path).unwrap();
+        let args = CheckArgs {
+            paths: vec![],
+            format: OutputFormat::Text,
+            strict: false,
+            gradual: false,
+            changed: false,
+            base: None,
+        };
+
+        // Should be disabled due to past deadline
+        assert!(!is_gradual_mode_active(&config, &args));
+    }
+
+    #[test]
+    fn is_leap_year_works_correctly() {
+        assert!(is_leap_year(2000)); // Divisible by 400
+        assert!(is_leap_year(2024)); // Divisible by 4, not by 100
+        assert!(!is_leap_year(1900)); // Divisible by 100, not by 400
+        assert!(!is_leap_year(2023)); // Not divisible by 4
+    }
+
+    #[test]
+    fn gradual_deadline_invalid_format_ignores_deadline() {
+        // Invalid formats should not disable gradual mode
+        assert!(!is_gradual_deadline_passed("not-a-date"));
+        assert!(!is_gradual_deadline_passed("2024/01/01")); // Wrong separator
+        assert!(!is_gradual_deadline_passed("2024-13-01")); // Invalid month
+        assert!(!is_gradual_deadline_passed("2024-01-32")); // Invalid day
     }
 }

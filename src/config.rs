@@ -87,6 +87,14 @@ pub struct RulesSection {
     /// Requires validate_paths to be enabled.
     #[serde(default)]
     pub warn_empty_paths: bool,
+    /// Gradual mode: treat errors as warnings during adoption.
+    /// When true, all validation errors become warnings and check exits 0.
+    #[serde(default)]
+    pub gradual: bool,
+    /// Deadline for exiting gradual mode (YYYY-MM-DD format).
+    /// After this date, gradual mode is ignored.
+    #[serde(default)]
+    pub gradual_until: Option<String>,
 }
 
 /// Document-type-specific validation rules.
@@ -202,6 +210,8 @@ impl Default for RulesSection {
             type_specific: TypeSpecificRulesSection::default(),
             validate_paths: false,
             warn_empty_paths: false,
+            gradual: false,
+            gradual_until: None,
         }
     }
 }
@@ -584,5 +594,75 @@ root = "docs"
 "#;
         let config = PaverConfig::parse(toml).unwrap();
         assert!(!config.rules.skip_output_matching);
+    }
+
+    #[test]
+    fn parse_config_with_gradual_mode() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+
+[rules]
+gradual = true
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(config.rules.gradual);
+    }
+
+    #[test]
+    fn default_gradual_is_false() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(!config.rules.gradual);
+    }
+
+    #[test]
+    fn parse_config_with_gradual_until() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+
+[rules]
+gradual = true
+gradual_until = "2024-06-01"
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert!(config.rules.gradual);
+        assert_eq!(config.rules.gradual_until, Some("2024-06-01".to_string()));
+    }
+
+    #[test]
+    fn default_gradual_until_is_none() {
+        let toml = r#"
+[paver]
+version = "0.1"
+
+[docs]
+root = "docs"
+"#;
+        let config = PaverConfig::parse(toml).unwrap();
+        assert_eq!(config.rules.gradual_until, None);
+    }
+
+    #[test]
+    fn config_roundtrip_with_gradual() {
+        let mut config = PaverConfig::default();
+        config.rules.gradual = true;
+        config.rules.gradual_until = Some("2024-12-31".to_string());
+        let serialized = toml::to_string_pretty(&config).unwrap();
+        let deserialized = PaverConfig::parse(&serialized).unwrap();
+        assert_eq!(config, deserialized);
     }
 }

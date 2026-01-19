@@ -681,6 +681,8 @@ Missing verification.
             type_specific: Default::default(),
             validate_paths: false,
             warn_empty_paths: false,
+            gradual: false,
+            gradual_until: None,
         };
         let engine = RulesEngine::from_config(&config);
 
@@ -719,6 +721,8 @@ Missing verification.
             type_specific: Default::default(),
             validate_paths: false,
             warn_empty_paths: false,
+            gradual: false,
+            gradual_until: None,
         };
         let engine = RulesEngine::from_config(&config);
 
@@ -1428,6 +1432,8 @@ This is a component.
             type_specific: Default::default(),
             validate_paths: true,
             warn_empty_paths: true,
+            gradual: false,
+            gradual_until: None,
         };
         let engine = RulesEngine::from_config_with_root(&config, "/project/root");
 
@@ -1454,6 +1460,8 @@ This is a component.
             type_specific: Default::default(),
             validate_paths: false,
             warn_empty_paths: false,
+            gradual: false,
+            gradual_until: None,
         };
         let engine = RulesEngine::from_config(&config);
 

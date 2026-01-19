@@ -50,6 +50,7 @@ fn main() -> Result<()> {
             paths,
             format,
             strict,
+            gradual,
             changed,
             base,
         } => {
@@ -57,6 +58,7 @@ fn main() -> Result<()> {
                 paths,
                 format,
                 strict,
+                gradual,
                 changed,
                 base,
             })?;
